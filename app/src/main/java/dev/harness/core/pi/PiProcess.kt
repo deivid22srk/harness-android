@@ -34,7 +34,7 @@ class PiProcess(
     /** The underlying OS process, or null when stopped. */
     override val process: Process? get() = running?.process
 
-    override val isAlive: Boolean get() = process?.isAlive == true
+    override fun isAlive(): Boolean = process?.isAlive == true
 
     @Synchronized
     override fun start(config: PiLaunchConfig) {

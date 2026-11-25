@@ -144,10 +144,11 @@ class AgentSessionTest {
         }
 
         override fun exitValue(): Int = if (killed) 137 else throw IllegalThreadStateException()
-        // PiProcessHandle surface: `process` and `isAlive` are explicit
-        // overrides (Kotlin val != inherited Java isAlive()).
+        // PiProcessHandle surface: `process` (val) and `isAlive` (fun) are
+        // explicit overrides — the fun form avoids the JVM signature clash
+        // with the inherited java.lang.Process#isAlive().
         override val process: Process? get() = this
-        override val isAlive: Boolean get() = !killed
+        override fun isAlive(): Boolean = !killed
         override fun destroy() {
             killed = true
             synchronized(lock) { lock.notifyAll() }

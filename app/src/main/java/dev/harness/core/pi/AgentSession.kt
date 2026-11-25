@@ -59,7 +59,10 @@ data class SessionNotice(val text: String, val level: NoticeLevel)
  */
 interface PiProcessHandle {
     val process: Process?
-    val isAlive: Boolean
+    /** Fun (not val): implementers also extend java.lang.Process, whose
+     *  `isAlive()` collides with a Kotlin `val isAlive` getter at the JVM
+     *  level ("accidental override"). */
+    fun isAlive(): Boolean
     fun start(config: PiLaunchConfig)
     fun stop()
 }
