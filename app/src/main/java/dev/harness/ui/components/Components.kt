@@ -56,7 +56,7 @@ fun HarnessPill(
     val colors = HarnessTheme
     Row(
         modifier = modifier
-            .clip(Radii.pill)
+            .clip(RoundedCornerShape(Radii.pill))
             .background(colors.accentMuted)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(horizontal = Space.md, vertical = Space.sm),

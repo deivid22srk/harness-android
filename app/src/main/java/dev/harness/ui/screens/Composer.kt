@@ -162,7 +162,7 @@ private fun ComposerChip(label: String, onClick: () -> Unit) {
     val colors = HarnessTheme
     Row(
         modifier = Modifier
-            .clip(Radii.pill)
+            .clip(RoundedCornerShape(Radii.pill))
             .background(colors.surface)
             .border(1.dp, colors.border, RoundedCornerShape(Radii.pill))
             .clickable(onClick = onClick)
