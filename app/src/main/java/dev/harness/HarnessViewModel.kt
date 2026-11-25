@@ -14,6 +14,7 @@ import dev.harness.core.rpc.ExtensionUiRequest
 import dev.harness.core.state.ChatState
 import dev.harness.service.AgentService
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -49,11 +50,12 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
 
     init {
         val settings = container.settings
+        val alreadyProvisioned = container.provisioner.isProvisioned()
         _ui.value = _ui.value.copy(
             selectedProvider = settings.provider,
             thinkingLevel = settings.thinking,
             provision = container.provisioner.state.value,
-            screen = if (container.provisioner.isProvisioned()) Screen.Projects else Screen.Onboarding,
+            screen = if (alreadyProvisioned) Screen.Projects else Screen.Onboarding,
         )
 
         viewModelScope.launch {
@@ -83,6 +85,20 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             container.session.pendingUi.collect { pending -> _ui.value = _ui.value.copy(pendingUi = pending) }
         }
         loadProjects()
+
+        // Provision automatically the first time so the onboarding screen
+        // actually advances instead of sitting at "Aguardando".
+        autoProvisionIfNeeded()
+    }
+
+    /**
+     * Starts provisioning unless it is already running or the environment is
+     * ready. Safe to call from multiple entry points (init, resume, retry).
+     */
+    private fun autoProvisionIfNeeded() {
+        if (container.provisioner.isProvisioned()) return
+        AgentService.startProvisioning(appContext)
+        container.ensureProvisioned(force = false)
     }
 
     // -----------------------------------------------------------------------
@@ -90,7 +106,8 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     // -----------------------------------------------------------------------
 
     fun startProvisioning(force: Boolean = false) {
-        viewModelScope.launch { container.provisioner.provision(force) }
+        AgentService.startProvisioning(appContext)
+        container.ensureProvisioned(force)
     }
 
     fun clearEnvironment() {
@@ -101,7 +118,8 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
                 provision = ProvisionState.Idle,
                 activeProject = null,
             )
-            container.provisioner.provision(force = true)
+            AgentService.startProvisioning(appContext)
+            container.ensureProvisioned(force = true)
         }
     }
 
@@ -141,7 +159,21 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     }
 
     fun openSettings() {
-        _ui.value = _ui.value.copy(screen = Screen.Settings, diagnostics = container.session.stderrLog())
+        val provisionLog = runCatching {
+            File(container.paths.logs, "provision.log").takeIf { it.exists() }?.readText()
+        }.getOrNull().orEmpty()
+        val stderr = container.session.stderrLog()
+        val diagnostics = buildString {
+            if (provisionLog.isNotBlank()) {
+                appendLine("== provisionamento ==")
+                appendLine(provisionLog.takeLast(4000))
+            }
+            if (stderr.isNotBlank()) {
+                appendLine("== agente (stderr) ==")
+                appendLine(stderr.takeLast(4000))
+            }
+        }
+        _ui.value = _ui.value.copy(screen = Screen.Settings, diagnostics = diagnostics)
     }
 
     fun backToProjects() {

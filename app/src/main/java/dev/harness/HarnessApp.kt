@@ -26,8 +26,26 @@ class HarnessContainer(app: Application) {
     val projects = ProjectRepository(paths, proot)
     val session = AgentSession(paths, proot, applicationScope)
 
+    private val provisionLock = java.util.concurrent.atomic.AtomicBoolean(false)
+
     init {
         paths.ensureDirs()
+    }
+
+    /**
+     * Starts provisioning exactly once, in the application scope so it survives
+     * Activity recreation. Subsequent calls are no-ops while it runs.
+     */
+    fun ensureProvisioned(force: Boolean = false) {
+        if (provisioner.isProvisioned() && !force) return
+        if (!provisionLock.compareAndSet(false, true)) return
+        applicationScope.launch {
+            try {
+                provisioner.provision(force)
+            } finally {
+                provisionLock.set(false)
+            }
+        }
     }
 
     /** Resolves the currently configured model, falling back to the catalog. */

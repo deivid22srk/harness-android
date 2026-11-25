@@ -14,7 +14,7 @@ sealed interface ProvisionState {
 
     data class InstallingPackages(val step: Int, val total: Int, val detail: String) : ProvisionState
 
-    data class InstallingAgent(val detail: String) : ProvisionState
+    data class InstallingAgent(val step: Int, val total: Int, val detail: String) : ProvisionState
 
     data class Ready(val nodeVersion: String, val piVersion: String) : ProvisionState
 
@@ -29,7 +29,7 @@ sealed interface ProvisionState {
             is Extracting -> 0.40f
             is Configuring -> 0.48f
             is InstallingPackages -> 0.50f + (step.toFloat() / total) * 0.25f
-            is InstallingAgent -> 0.80f
+            is InstallingAgent -> 0.80f + (step.toFloat() / total) * 0.15f
             is Ready -> 1f
             is Failed -> 0f
         }
@@ -51,7 +51,7 @@ sealed interface ProvisionState {
         get() = when (this) {
             is Downloading -> "${(fraction * 100).toInt()}%"
             is InstallingPackages -> "etapa $step de $total"
-            is InstallingAgent -> detail
+            is InstallingAgent -> "etapa $step de $total"
             is Failed -> message
             else -> ""
         }

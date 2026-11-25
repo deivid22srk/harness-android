@@ -44,10 +44,17 @@ class AgentService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+            ACTION_PROVISION -> {
+                // Keep the process alive while the environment is prepared
+                // (download + apk/npm), which can take a while and must not be
+                // killed when the screen turns off.
+                startForegroundCompat(provisioning = true)
+                acquireWakeLock()
+            }
             else -> {
                 // Keeps the runtime alive; the UI owns starting the session so
                 // there is a single place that launches the Pi process.
-                startForegroundCompat()
+                startForegroundCompat(provisioning = false)
                 acquireWakeLock()
             }
         }
@@ -61,8 +68,8 @@ class AgentService : Service() {
 
     private fun container() = (application as HarnessApp).container
 
-    private fun startForegroundCompat() {
-        val notification = buildNotification()
+    private fun startForegroundCompat(provisioning: Boolean = false) {
+        val notification = buildNotification(provisioning)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ServiceCompat.startForeground(
                 this,
@@ -79,7 +86,7 @@ class AgentService : Service() {
         ServiceCompat.stopForeground(this, android.app.Service.STOP_FOREGROUND_REMOVE)
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(provisioning: Boolean = false): Notification {
         val open = PendingIntent.getActivity(
             this,
             0,
@@ -92,10 +99,12 @@ class AgentService : Service() {
             Intent(this, AgentService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val title = if (provisioning) "Preparando o ambiente" else "Harness ativo"
+        val text = if (provisioning) "Instalando ferramentas…" else "O agente está pronto para continuar."
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Harness ativo")
-            .setContentText("O agente está pronto para continuar.")
+            .setContentTitle(title)
+            .setContentText(text)
             .setContentIntent(open)
             .addAction(0, "Parar", stop)
             .setOngoing(true)
@@ -139,13 +148,27 @@ class AgentService : Service() {
         private const val CHANNEL_ID = "harness_agent"
         private const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "dev.harness.action.STOP"
+        const val ACTION_PROVISION = "dev.harness.action.PROVISION"
 
         fun start(context: Context) {
-            val intent = Intent(context, AgentService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            startWithAction(context, null)
+        }
+
+        /** Keeps the process alive during environment provisioning. */
+        fun startProvisioning(context: Context) {
+            startWithAction(context, ACTION_PROVISION)
+        }
+
+        private fun startWithAction(context: Context, action: String?) {
+            val intent = Intent(context, AgentService::class.java).apply {
+                if (action != null) setAction(action)
+            }
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             }
         }
 

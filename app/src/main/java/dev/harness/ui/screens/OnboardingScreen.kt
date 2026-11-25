@@ -100,14 +100,67 @@ fun OnboardingScreen(
                     Text(state.label, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
                     Text(state.detailText, style = MonoStyle, color = colors.textTertiary)
                 }
-                Spacer(Modifier.height(Space.sm))
+                Spacer(Modifier.height(Space.lg))
+                val steps = provisionSteps(state)
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    steps.forEach { step ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                            Box(
+                                Modifier
+                                    .size(8.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (step.done) colors.toolOk else colors.accentMuted),
+                            )
+                            Text(
+                                step.label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (step.active) colors.textPrimary else colors.textTertiary,
+                            )
+                            if (step.active) {
+                                Text("…", style = MonoStyle, color = colors.textSecondary)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(Space.lg))
                 Text(
-                    "Na primeira vez baixamos o ambiente (~4 MB) e instalamos as ferramentas. Depois disso é instantâneo.",
+                    if (state is ProvisionState.Idle) "Iniciando…" else "Na primeira vez baixamos o ambiente (~4 MB) e instalamos as ferramentas. Depois disso é instantâneo.",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textTertiary,
                     textAlign = TextAlign.Center,
                 )
             }
         }
+    }
+}
+
+private data class ProvisionStep(val label: String, val done: Boolean, val active: Boolean)
+
+/** Maps the coarse provisioning state to the visible checklist. */
+private fun provisionSteps(state: ProvisionState): List<ProvisionStep> {
+    val order = listOf(
+        "Verificando ambiente",
+        "Baixando ambiente",
+        "Extraindo ambiente",
+        "Instalando ferramentas",
+        "Preparando o Pi",
+    )
+    val currentIndex = when (state) {
+        is ProvisionState.Idle -> -1
+        is ProvisionState.Preparing -> 0
+        is ProvisionState.Downloading -> 1
+        is ProvisionState.Extracting -> 2
+        is ProvisionState.Configuring -> 2
+        is ProvisionState.InstallingPackages -> 3
+        is ProvisionState.InstallingAgent -> 4
+        is ProvisionState.Ready -> order.size
+        is ProvisionState.Failed -> -1
+    }
+    return order.mapIndexed { index, label ->
+        ProvisionStep(
+            label = label,
+            done = state is ProvisionState.Ready || index < currentIndex,
+            active = index == currentIndex,
+        )
     }
 }
