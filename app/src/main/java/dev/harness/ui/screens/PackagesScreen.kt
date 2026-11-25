@@ -512,7 +512,7 @@ private fun PackageRow(
             }
             if (pkg.features.isNotEmpty()) {
                 Text(
-                    pkg.features.joinToString(" · ") { featureLabel(it) },
+                    featuresText(pkg.features),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textTertiary,
                 )
@@ -542,6 +542,15 @@ private fun featureLabel(feature: PackageFeature): String = stringResource(
         PackageFeature.THEMES -> R.string.packages_feature_themes
     },
 )
+
+/** Labels built with the inline buildList so stringResource stays composable-legal. */
+@Composable
+private fun featuresText(features: Set<PackageFeature>): String = buildList {
+    if (PackageFeature.EXTENSIONS in features) add(stringResource(R.string.packages_feature_extensions))
+    if (PackageFeature.SKILLS in features) add(stringResource(R.string.packages_feature_skills))
+    if (PackageFeature.PROMPTS in features) add(stringResource(R.string.packages_feature_prompts))
+    if (PackageFeature.THEMES in features) add(stringResource(R.string.packages_feature_themes))
+}.joinToString(" · ")
 
 @Composable
 private fun SearchResultRow(
@@ -591,7 +600,7 @@ private fun SearchResultRow(
             }
             if (features.isNotEmpty()) {
                 Text(
-                    features.joinToString(" · ") { featureLabel(it) },
+                    featuresText(features),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.accentText,
                 )
