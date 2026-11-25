@@ -67,7 +67,7 @@ internal fun currentCodeColors(): CodeColors {
             keyword = Color(0xFF7C3AED),
             string = Color(0xFF047857),
             number = Color(0xFFB45309),
-            comment = Color(0xFF6B7280),
+            comment = Color(0xFF5D6579), // 5.25:1 on light codeBg
             type = Color(0xFF0369A1),
             annotation = Color(0xFFC2410C),
             plain = c.textPrimary,

@@ -390,7 +390,7 @@ private fun ProviderKeySection(
                 Text(
                     stringResource(R.string.settings_key_saved),
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.toolOk,
+                    color = colors.toolOkText,
                 )
             }
         }

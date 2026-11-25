@@ -112,7 +112,7 @@ fun ToolCallCard(
                     Text(
                         statusLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = toolStatusColor(tool.status),
+                        color = toolStatusTextColor(tool.status),
                     )
                 }
                 if (tool.summary.isNotBlank()) {
@@ -199,11 +199,12 @@ private fun StatusDot(status: ToolStatus) {
     }
 }
 
+/** Text-safe status colors (AA); dots still use [toolStatusColor]. */
 @Composable
-private fun toolStatusColor(status: ToolStatus): Color = when (status) {
-    ToolStatus.Running -> HarnessTheme.toolRunning
-    ToolStatus.Ok -> HarnessTheme.toolOk
-    ToolStatus.Error -> HarnessTheme.toolError
+private fun toolStatusTextColor(status: ToolStatus): Color = when (status) {
+    ToolStatus.Running -> HarnessTheme.toolWarningText
+    ToolStatus.Ok -> HarnessTheme.toolOkText
+    ToolStatus.Error -> HarnessTheme.toolErrorText
     ToolStatus.Cancelled -> HarnessTheme.textTertiary
 }
 

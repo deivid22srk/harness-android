@@ -152,6 +152,7 @@ fun ChatScreen(
                     onQueue = viewModel::steer,
                     prefill = uiState.composerPrefill,
                     prefillToken = uiState.composerPrefillToken,
+                    onPrefillConsumed = viewModel::consumeComposerPrefill,
                     onStop = viewModel::stopAgent,
                     onOpenModelPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Model, true) },
                     onOpenThinkingPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Thinking, true) },
@@ -576,7 +577,7 @@ private fun NoticeRow(item: ChatItem.Notice) {
     val colors = HarnessTheme
     val tint = when (item.level) {
         NoticeLevel.Info -> colors.textTertiary
-        NoticeLevel.Warning -> colors.toolRunning
+        NoticeLevel.Warning -> colors.toolWarningText
         NoticeLevel.Error -> colors.toolErrorText
     }
     Row(

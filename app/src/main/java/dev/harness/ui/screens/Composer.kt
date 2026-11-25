@@ -72,6 +72,7 @@ fun Composer(
     onQueue: (String) -> Unit,
     prefill: String? = null,
     prefillToken: Int = 0,
+    onPrefillConsumed: () -> Unit = {},
     onStop: () -> Unit,
     onOpenModelPicker: () -> Unit,
     onOpenThinkingPicker: () -> Unit,
@@ -84,9 +85,15 @@ fun Composer(
     // composable (restores correctly per project, survives process death).
     var text by rememberSaveable { mutableStateOf("") }
 
-    // "Editar e reenviar" pushes the past message into the field.
+    // "Editar e reenviar" pushes the past message into the field. The prefill
+    // is consumed immediately so a stale value never overwrites the user's
+    // draft when switching projects or re-entering the chat.
     LaunchedEffect(prefillToken) {
-        prefill?.let { text = it }
+        val value = prefill
+        if (value != null) {
+            text = value
+            onPrefillConsumed()
+        }
     }
 
     val busy = state.isBusy

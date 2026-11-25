@@ -35,6 +35,7 @@ LIGHT = {
     'success': '#059669', 'warning': '#B45309', 'error': '#DC2626',
     'text': '#0F1320', 'text2': '#5A6378', 'text3': '#646D82', 'codeBg': '#F1F3F9',
     'okText': '#067647', 'warnTextOnCont': '#93370D', 'warnCont': '#FCEDD4', 'errText': '#B42318',
+    'comment': '#5D6579',
     # refinements
     'primaryCont': '#E4DCFF', 'onPrimCont': '#2A2050',
     'secondaryText': '#0E7490', 'successText': '#067647', 'errorText': '#B42318',
@@ -68,6 +69,7 @@ pairs_light = [
     ('okText/codeBg (diff + lines)', 'okText', 'codeBg'),
     ('errText/codeBg (diff - lines)', 'errText', 'codeBg'),
     ('warnTextOnCont/warnCont (snackbar)', 'warnTextOnCont', 'warnCont'),
+    ('comment/codeBg (syntax)', 'comment', 'codeBg'),
 ]
 
 

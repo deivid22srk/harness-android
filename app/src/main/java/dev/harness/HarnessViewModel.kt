@@ -397,6 +397,13 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         )
     }
 
+    /** Clears the prefill after the composer applied it (keeps the token). */
+    fun consumeComposerPrefill() {
+        if (_ui.value.composerPrefill != null) {
+            _ui.value = _ui.value.copy(composerPrefill = null)
+        }
+    }
+
     fun stopAgent() {
         viewModelScope.launch { container.session.abort() }
     }
