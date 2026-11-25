@@ -164,9 +164,18 @@ chmod +x "$WORK/hostbin/which"
 # ---------------------------------------------------------------------------
 echo "==> PRoot $PROOT_REF"
 git clone --depth 1 --branch "$PROOT_REF" "$PROOT_REPO" "$WORK/proot"
+
+# ashmem_memfd.c uses strcmp/memset without including <string.h>. Under the
+# NDK's stricter C mode this is an error, and the loader is freestanding so a
+# global -include would break it. Patch the single file instead.
+ASHMEM="$WORK/proot/src/extension/ashmem_memfd/ashmem_memfd.c"
+if [ -f "$ASHMEM" ] && ! grep -q "include <string.h>" "$ASHMEM"; then
+    sed -i 's|#include <stdlib.h>|#include <stdlib.h>\n#include <string.h>|' "$ASHMEM"
+fi
+
 cd "$WORK/proot/src"
 
-CFLAGS="-O2 -fPIC -DARG_MAX=131072 -include string.h -I$WORK/sysroot/include"
+CFLAGS="-O2 -fPIC -DARG_MAX=131072 -I$WORK/sysroot/include"
 # -landroid-shmem resolves against the shared shim we bundle; talloc is static.
 LDFLAGS="-Wl,-z,noexecstack -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -Wl,-Bdynamic -landroid-shmem"
 
