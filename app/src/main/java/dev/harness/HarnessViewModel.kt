@@ -33,6 +33,11 @@ import java.io.File
 
 enum class Screen { Onboarding, Projects, Chat, Settings, Sessions }
 
+/** Settings navigation route: hub (null) or a specific category screen. */
+enum class SettingsSection {
+    Account, Appearance, Chat, Sessions, Packages, Environment, Privacy, Diagnostics, About,
+}
+
 /** A model listed in the "Obter modelos" dialog. */
 data class ModelOption(
     val provider: String,
@@ -90,6 +95,14 @@ data class HarnessUiState(
     val themeMode: String = "system",
     val dynamicColor: Boolean = false,
     val fontScale: Float = 1f,
+    // Chat behavior preferences
+    val autoScroll: Boolean = true,
+    val renderMarkdown: Boolean = true,
+    val sendOnEnter: Boolean = false,
+    val hapticFeedback: Boolean = true,
+    // Settings hub navigation (null = hub) + search
+    val settingsSection: SettingsSection? = null,
+    val settingsSearch: String = "",
     // "Obter modelos" dialog
     val modelsDialogProvider: String? = null,
     val modelsLoading: Boolean = false,
@@ -138,6 +151,10 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             themeMode = settings.themeMode,
             dynamicColor = settings.dynamicColor,
             fontScale = settings.fontScale,
+            autoScroll = settings.autoScroll,
+            renderMarkdown = settings.renderMarkdown,
+            sendOnEnter = settings.sendOnEnter,
+            hapticFeedback = settings.hapticFeedback,
         )
 
         viewModelScope.launch {
@@ -505,10 +522,40 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             val diagnostics = withContext(Dispatchers.IO) { buildDiagnostics() }
             _ui.value = _ui.value.copy(
                 screen = Screen.Settings,
+                settingsSection = null,
+                settingsSearch = "",
                 diagnostics = diagnostics,
                 providers = container.settings.allProviders(),
             )
         }
+    }
+
+    /** Opens a specific settings category (hub row tap or deep link). */
+    fun openSettingsSection(section: SettingsSection) {
+        if (section == SettingsSection.Packages) {
+            // Implemented in Rodada 3; the hub only offers it then.
+            return
+        }
+        _ui.value = _ui.value.copy(
+            screen = Screen.Settings,
+            settingsSection = section,
+            settingsSearch = "",
+        )
+        if (_ui.value.diagnostics.isBlank()) {
+            viewModelScope.launch {
+                val diagnostics = withContext(Dispatchers.IO) { buildDiagnostics() }
+                _ui.value = _ui.value.copy(diagnostics = diagnostics)
+            }
+        }
+    }
+
+    /** Back from a category to the hub (predictive back compatible). */
+    fun backToSettingsHub() {
+        _ui.value = _ui.value.copy(settingsSection = null)
+    }
+
+    fun setSettingsSearch(query: String) {
+        _ui.value = _ui.value.copy(settingsSearch = query)
     }
 
     private fun buildDiagnostics(): String {
@@ -668,7 +715,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     }
 
     // -----------------------------------------------------------------------
-    // Appearance
+    // Appearance & chat behavior
     // -----------------------------------------------------------------------
 
     fun setThemeMode(mode: String) {
@@ -684,6 +731,93 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     fun setFontScale(scale: Float) {
         container.settings.fontScale = scale
         _ui.value = _ui.value.copy(fontScale = scale)
+    }
+
+    fun setAutoScroll(enabled: Boolean) {
+        container.settings.autoScroll = enabled
+        _ui.value = _ui.value.copy(autoScroll = enabled)
+    }
+
+    fun setRenderMarkdown(enabled: Boolean) {
+        container.settings.renderMarkdown = enabled
+        _ui.value = _ui.value.copy(renderMarkdown = enabled)
+    }
+
+    fun setSendOnEnter(enabled: Boolean) {
+        container.settings.sendOnEnter = enabled
+        _ui.value = _ui.value.copy(sendOnEnter = enabled)
+    }
+
+    fun setHapticFeedback(enabled: Boolean) {
+        container.settings.hapticFeedback = enabled
+        _ui.value = _ui.value.copy(hapticFeedback = enabled)
+    }
+
+    fun setResumeLastSession(enabled: Boolean) {
+        container.settings.resumeLastSession = enabled
+    }
+
+    /** Current resume preference (hub subtitle). */
+    fun resumeLastSessionEnabled(): Boolean = container.settings.resumeLastSession
+
+    /** Storage report for the "Projetos e sessões" settings screen. */
+    data class StorageUsage(val rootfsBytes: Long, val sessionsBytes: Long, val projectsBytes: Long) {
+        val totalBytes: Long get() = rootfsBytes + sessionsBytes + projectsBytes
+    }
+
+    suspend fun storageUsage(): StorageUsage = withContext(Dispatchers.IO) {
+        StorageUsage(
+            rootfsBytes = dirSize(container.paths.envDir),
+            sessionsBytes = dirSize(File(container.paths.home, ".pi/agent/sessions")),
+            projectsBytes = dirSize(container.paths.projects),
+        )
+    }
+
+    private fun dirSize(dir: File?): Long {
+        if (dir == null || !dir.exists()) return 0
+        val stack = ArrayDeque<File>().apply { add(dir) }
+        var total = 0L
+        while (stack.isNotEmpty()) {
+            val f = stack.removeLast()
+            if (f.isDirectory) stack.addAll(f.listFiles().orEmpty()) else total += f.length()
+        }
+        return total
+    }
+
+    /** Typed snapshot for screens that need a non-Compose read. */
+    fun settingsSnapshot(): dev.harness.core.settings.AppSettings = container.settings.current
+
+    /** Whether an API key is configured for a provider (masked UI usage). */
+    fun hasApiKey(providerId: String): Boolean =
+        container.settings.apiKey(providerId)?.isNotBlank() == true
+
+    /** Provisioned environment version marker ("" when absent). */
+    fun environmentVersion(): String =
+        runCatching {
+            container.paths.versionMarker.takeIf { it.exists() }?.readText()?.trim().orEmpty()
+        }.getOrDefault("").ifBlank { "—" }
+
+    /**
+     * Runs a real environment test (node + pi versions inside PRoot) and
+     * reports the output via [onResult] — an honest connectivity check for
+     * the diagnostics screen (a provider test would need a billed API call).
+     */
+    fun testEnvironment(onResult: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val output = StringBuilder()
+            for (argv in listOf(listOf("node", "--version"), listOf("pi", "--version"))) {
+                val result = runCatching {
+                    dev.harness.core.env.ProcessRunner.runCombined(
+                        container.proot.argv(argv),
+                        container.proot.hostEnv(emptyMap()),
+                    )
+                }
+                result.getOrNull()?.let { r ->
+                    output.appendLine("${argv[0]}: ${r.output.take(120).trim()} (exit ${r.exitCode})")
+                } ?: output.appendLine("${argv[0]}: erro — ${result.exceptionOrNull()?.message}")
+            }
+            withContext(Dispatchers.Main) { onResult(output.toString()) }
+        }
     }
 
     // -----------------------------------------------------------------------

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -37,6 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -79,6 +82,8 @@ fun Composer(
     onAttach: () -> Unit,
     onRemoveImage: (PendingImage) -> Unit,
     modifier: Modifier = Modifier,
+    sendOnEnter: Boolean = false,
+    hapticFeedback: Boolean = true,
 ) {
     val colors = HarnessTheme
     // Draft is scoped per project by the SaveableStateProvider around this
@@ -98,6 +103,7 @@ fun Composer(
 
     val busy = state.isBusy
     val canSend = text.isNotBlank()
+    val haptics = LocalHapticFeedback.current
 
     Column(
         modifier = modifier
@@ -221,8 +227,22 @@ fun Composer(
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Default,
+                        // "Enviar com Enter" (Configurações → Chat): the IME
+                        // action triggers send instead of a new line.
+                        imeAction = if (sendOnEnter) ImeAction.Send else ImeAction.Default,
                     ),
+                    keyboardActions = if (sendOnEnter) {
+                        KeyboardActions(onSend = {
+                            if (text.isNotBlank()) {
+                                if (hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val payload = text
+                                text = ""
+                                onSend(payload)
+                            }
+                        })
+                    } else {
+                        KeyboardActions.Default
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -267,6 +287,7 @@ fun Composer(
                             if (busy) {
                                 onStop()
                             } else {
+                                if (hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 val payload = text
                                 text = ""
                                 onSend(payload)

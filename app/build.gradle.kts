@@ -120,6 +120,8 @@ dependencies {
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.material3.window.size)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -46,6 +46,7 @@ fun HarnessRoot(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
     onRequestBatteryExemption: () -> Unit,
+    wideScreen: Boolean = false,
 ) {
     val colors = HarnessTheme
     val snackbarHostState = remember { SnackbarHostState() }
@@ -60,7 +61,11 @@ fun HarnessRoot(
             uiState.screen == Screen.Sessions,
     ) {
         when (uiState.screen) {
-            Screen.Settings -> viewModel.backToProjects()
+            // Settings: back leaves the open category first (predictive back),
+            // then the screen.
+            Screen.Settings -> {
+                if (uiState.settingsSection != null) viewModel.backToSettingsHub() else viewModel.backToProjects()
+            }
             Screen.Chat -> viewModel.backToProjects()
             Screen.Sessions -> viewModel.backFromSessions()
             else -> Unit
@@ -83,6 +88,7 @@ fun HarnessRoot(
                 uiState = uiState,
                 viewModel = viewModel,
                 onBack = viewModel::backToProjects,
+                wideScreen = wideScreen,
             )
 
             Screen.Chat -> ChatScreen(

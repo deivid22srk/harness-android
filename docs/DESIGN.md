@@ -171,3 +171,30 @@ Padrões novos:
 `Screen` ganhou `Sessions`. Fluxos: Projects → Chat (retoma) ou Projects →
 Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
 (`backFromSessions` volta ao Chat quando há sessão viva, senão aos Projetos).
+
+## 10. Configurações por categorias (frente B)
+
+- **Hub + busca**: `SettingsScreen` vira um hub com `SettingsCategoryRow`
+  (ícone, título, subtítulo com o valor atual — "Tema: Escuro", "Chave: ✓").
+  A busca filtra as categorias pelo título e leva direto à tela certa.
+- **Categorias**: cada uma abre sua tela (`SettingsSection` enum em
+  `HarnessUiState.settingsSection`, predictive back fecha categoria → hub →
+  sai). Deep link `harness://settings/{categoria}` (ex.: `harness://settings/appearance`).
+- **Lista-detalhe** em telas largas (`WindowWidthSizeClass ≥ Medium`): hub à
+  esquerda (360 dp), categoria à direita — tablet e dobrável.
+- **Componentes** (`ui/components/settings/SettingsRows.kt`, com previews
+  escuro/claro/fonte grande): `SettingsCategoryRow`, `SettingsSwitchRow`,
+  `SettingsChoiceRow` (+ `HBottomSheetChoice` com radio),
+  `SettingsSliderRow` (discreto, para a fonte), `SettingsInfoRow`,
+  `SettingsDangerRow` (ações destrutivas separadas com confirmação).
+- **Persistência tipada**: `SettingsRepository` migrado para **DataStore**
+  (`AppSettings` imutável com defaults; snapshot em memória para leituras
+  síncronas sem refazer os ViewModels; migração one-shot do SharedPreferences
+  legado, que é limpo ao final; chaves de API permanecem no `SecretStore`
+  intocadas).
+- **Preferências de chat reais**: rolagem automática (`ChatList`), markdown
+  on/off, enviar com Enter (IME action do `Composer`) e haptics ao enviar —
+  todas ligadas ao comportamento, nada de opção morta.
+- **Robustez**: `Apagar dados` (Privacidade) e `Reinstalar ambiente`
+  (Ambiente) com confirmação; diagnósticos com cópia e teste real do ambiente
+  (node/pi versões via PRoot).

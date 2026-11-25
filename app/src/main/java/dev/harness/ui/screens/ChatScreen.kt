@@ -145,6 +145,8 @@ fun ChatScreen(
                 state = uiState.chat,
                 isBusy = uiState.chat.isBusy,
                 lastPrompt = viewModel.lastPromptForRegeneration(),
+                autoScroll = uiState.autoScroll,
+                renderMarkdown = uiState.renderMarkdown,
                 onRegenerate = viewModel::regenerate,
                 onEditResend = viewModel::requestEditResend,
                 onSuggestion = viewModel::send,
@@ -172,6 +174,8 @@ fun ChatScreen(
                     onOpenThinkingPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Thinking, true) },
                     onAttach = { viewModel.setPicker(HarnessViewModel.Pickers.Attach, true) },
                     onRemoveImage = viewModel::removePendingImage,
+                    sendOnEnter = uiState.sendOnEnter,
+                    hapticFeedback = uiState.hapticFeedback,
                 )
             }
         }
@@ -390,6 +394,8 @@ fun ChatList(
     onEditResend: (String) -> Unit,
     onSuggestion: (String) -> Unit,
     modifier: Modifier = Modifier,
+    autoScroll: Boolean = true,
+    renderMarkdown: Boolean = true,
 ) {
     val listState = rememberLazyListState()
     var stuckToBottom by remember { mutableStateOf(true) }
@@ -402,9 +408,10 @@ fun ChatList(
     }
 
     // Re-scroll when items are added OR when the streaming tail grows.
+    // Gated by the "rolagem automática" setting (Configurações → Chat).
     val tailLength = (state.items.lastOrNull() as? ChatItem.AssistantMessage)?.text?.length ?: 0
     LaunchedEffect(state.items.size, tailLength, isBusy) {
-        if (stuckToBottom && state.items.isNotEmpty()) {
+        if (autoScroll && stuckToBottom && state.items.isNotEmpty()) {
             runCatching { listState.animateScrollToItem(state.items.lastIndex) }
         }
     }
@@ -454,6 +461,7 @@ fun ChatList(
                                 item,
                                 canRegenerate = lastPrompt != null && !isBusy && item == state.items.lastOrNull(),
                                 onRegenerate = onRegenerate,
+                                renderMarkdown = renderMarkdown,
                             )
                             is ChatItem.ToolGroup -> ToolGroupBlock(item)
                             is ChatItem.Notice -> NoticeRow(item)
@@ -532,6 +540,7 @@ private fun AssistantMessage(
     item: ChatItem.AssistantMessage,
     canRegenerate: Boolean,
     onRegenerate: () -> Unit,
+    renderMarkdown: Boolean = true,
 ) {
     val colors = HarnessTheme
     val clipboard = LocalClipboardManager.current
@@ -549,7 +558,15 @@ private fun AssistantMessage(
         }
         if (item.text.isNotBlank()) {
             SelectionContainer(modifier = Modifier.fillMaxWidth()) {
-                HMarkdown(item.text)
+                if (renderMarkdown) {
+                    HMarkdown(item.text)
+                } else {
+                    Text(
+                        item.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.textPrimary,
+                    )
+                }
             }
         }
         item.error?.let {
