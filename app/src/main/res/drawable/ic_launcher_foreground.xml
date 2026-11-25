@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Minimal chevron/prompt glyph, centered in the 72dp safe zone. -->
+    <path
+        android:fillColor="#EDEDED"
+        android:pathData="M44,38 L44,46 L58,54 L44,62 L44,70 L70,54 Z" />
+    <path
+        android:fillColor="#8A8A8A"
+        android:pathData="M36,76 L72,76 L72,80 L36,80 Z" />
+</vector>

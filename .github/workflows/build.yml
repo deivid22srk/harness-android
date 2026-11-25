@@ -1,0 +1,197 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NDK_VERSION: "27.2.12479018"
+  PI_VERSION: "1.6.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Compiles PRoot + loader for Android (aarch64) and publishes them as an
+  # artifact. See native/proot/build-proot.sh for why this uses the NDK and the
+  # Termux PRoot fork rather than musl/Alpine.
+  # ---------------------------------------------------------------------------
+  proot:
+    name: Build PRoot (aarch64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
+
+      - name: Export NDK path
+        run: echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
+
+      - name: Cache PRoot build
+        uses: actions/cache@v4
+        with:
+          path: |
+            native/proot/proot-build
+          key: proot-${{ runner.os }}-${{ runner.arch }}-v5.1.107.102-talloc-2.5.0
+
+      - name: Build PRoot + loader
+        run: |
+          chmod +x native/proot/build-proot.sh
+          NPROC="$(nproc)" native/proot/build-proot.sh
+
+      - name: Verify binaries
+        run: |
+          ls -l native/proot/out
+          test -s native/proot/out/libproot.so
+          test -s native/proot/out/libproot-loader.so
+
+      - name: Upload PRoot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: proot-binaries
+          path: native/proot/out/
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Proves the whole chain Alpine -> Node -> Pi -> RPC works, without a device.
+  # Runs an aarch64 Alpine container under QEMU.
+  # ---------------------------------------------------------------------------
+  smoke:
+    name: Smoke test (Alpine → Node → Pi → RPC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Run chain inside aarch64 Alpine
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD/scripts:/scripts:ro" \
+            alpine:3.24 /bin/sh /scripts/smoke-test.sh "${{ env.PI_VERSION }}"
+
+  # ---------------------------------------------------------------------------
+  # Builds the signed release APK.
+  # ---------------------------------------------------------------------------
+  apk:
+    name: Build APK (arm64-v8a)
+    needs: proot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Download PRoot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: proot-binaries
+          path: app/src/main/jniLibs/arm64-v8a/
+
+      - name: Compute version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            NAME="${GITHUB_REF_NAME#v}"
+          else
+            NAME="0.1.0-${GITHUB_SHA::7}"
+          fi
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Build, lint and unit test
+        env:
+          HARNESS_VERSION_NAME: ${{ steps.version.outputs.name }}
+          HARNESS_VERSION_CODE: ${{ steps.version.outputs.code }}
+          HARNESS_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          HARNESS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          HARNESS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          HARNESS_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleRelease
+
+      - name: Rename APK
+        id: apk
+        run: |
+          SRC="app/build/outputs/apk/release/app-release.apk"
+          OUT="harness-${{ steps.version.outputs.name }}-arm64-v8a.apk"
+          mv "$SRC" "$OUT"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -m "$OUT" | cut -f1)" >> "$GITHUB_OUTPUT"
+          ls -l "$OUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+
+      - name: Job summary
+        run: |
+          {
+            echo "### Harness APK"
+            echo ""
+            echo "- File: \`${{ steps.apk.outputs.path }}\`"
+            echo "- Size: **${{ steps.apk.outputs.size }} MB**"
+            echo "- Version: ${{ steps.version.outputs.name }} (${{ steps.version.outputs.code }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Publishes a GitHub Release for tags v*.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Release
+    needs: apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: harness-apk
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          APK=$(ls harness-*.apk | head -1)
+          gh release create "${GITHUB_REF_NAME}" "$APK" \
+            --title "Harness ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --notes "APK assinado para arm64-v8a. Consulte o README para instalar."
