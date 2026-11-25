@@ -62,7 +62,7 @@ class PiProcess(
 
         val guestEnv = HashMap<String, String>()
         guestEnv.putAll(config.apiKeys)
-        return proot.argv(piArgs, guestEnv)
+        return proot.argv(piArgs, guestEnv, workDir = config.workDirGuest)
     }
 
     fun stderrFile(): File = File(paths.logs, "pi-stderr.log").apply { parentFile?.mkdirs() }

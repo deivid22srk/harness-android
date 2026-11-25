@@ -25,7 +25,7 @@ PROOT_REPO="${PROOT_REPO:-https://github.com/termux/proot.git}"
 PROOT_REF="${PROOT_REF:-v5.1.107.102}"
 SHMEM_REF="${SHMEM_REF:-v0.7}"
 TALLOC_VERSION="${TALLOC_VERSION:-2.4.2}"
-OUT="${OUT:-$(pwd)/out}"
+OUT="${OUT:-$(cd "$(dirname "$0")" && pwd)/out}"
 NPROC="${NPROC:-$(nproc 2>/dev/null || echo 2)}"
 
 NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
@@ -52,7 +52,7 @@ READELF="$TOOLCHAIN/bin/llvm-readelf"
 
 [ -x "$CC" ] || { echo "error: compiler not found: $CC" >&2; exit 1; }
 
-WORK="$(pwd)/proot-build"
+WORK="${WORK:-$(cd "$(dirname "$0")" && pwd)/proot-build}"
 rm -rf "$WORK"
 mkdir -p "$WORK" "$OUT" "$WORK/sysroot/lib" "$WORK/sysroot/include"
 mkdir -p "$WORK/hostbin"

@@ -33,7 +33,11 @@ class ProotCommand(private val paths: HarnessPaths) {
      * `-0` fakes uid 0, `--link2symlink` emulates hardlinks (unsupported on /data),
      * `--kill-on-exit` avoids orphaned tracees.
      */
-    fun argv(guestCmd: List<String>, guestEnv: Map<String, String> = emptyMap()): List<String> {
+    fun argv(
+        guestCmd: List<String>,
+        guestEnv: Map<String, String> = emptyMap(),
+        workDir: String = "/root",
+    ): List<String> {
         val argv = mutableListOf(
             paths.prootBinary.absolutePath,
             "--kill-on-exit",
@@ -44,7 +48,7 @@ class ProotCommand(private val paths: HarnessPaths) {
             "-b", "/proc",
             "-b", "/sys",
             "-b", "${paths.home.absolutePath}:/root",
-            "-w", "/root",
+            "-w", workDir,
         )
         // Fake files for Android's restricted /proc so Node's os.cpus() and
         // friends do not crash. Only added when present in the rootfs.
