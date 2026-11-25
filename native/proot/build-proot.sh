@@ -81,8 +81,20 @@ git clone --depth 1 --branch "$SHMEM_REF" https://github.com/termux/libandroid-s
 # ---------------------------------------------------------------------------
 echo "==> talloc $TALLOC_VERSION"
 mkdir -p "$WORK/talloc"
-curl -sSL "https://www.samba.org/ftp/talloc/talloc-${TALLOC_VERSION}.tar.gz" \
-    | tar xz -C "$WORK/talloc" --strip-components=1
+TALLOC_TARBALL="$WORK/talloc.tar.gz"
+downloaded=0
+for url in \
+    "https://www.samba.org/ftp/talloc/talloc-${TALLOC_VERSION}.tar.gz" \
+    "https://download.samba.org/pub/talloc/talloc-${TALLOC_VERSION}.tar.gz"; do
+    if curl -fsSL --retry 4 --retry-delay 5 --retry-all-errors --max-time 120 \
+        "$url" -o "$TALLOC_TARBALL" && [ -s "$TALLOC_TARBALL" ]; then
+        downloaded=1
+        break
+    fi
+done
+[ "$downloaded" = 1 ] || { echo "error: could not download talloc tarball" >&2; exit 1; }
+tar xzf "$TALLOC_TARBALL" -C "$WORK/talloc" --strip-components=1 \
+    || { echo "error: talloc tarball is not a valid archive" >&2; exit 1; }
 cat > "$WORK/talloc/cross-answers.txt" <<'EOF'
 Checking uname sysname type: "Linux"
 Checking uname machine type: "dontcare"

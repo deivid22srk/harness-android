@@ -248,12 +248,12 @@ fun MarkdownLite(text: String, modifier: Modifier = Modifier) {
             when (block) {
                 is MdBlock.Code -> CodeBlock(code = block.code, language = block.language)
                 is MdBlock.Heading -> Text(
-                    text = inline(block.text),
+                    text = renderInline(block.text),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
                 is MdBlock.Paragraph -> Text(
-                    text = inline(block.text),
+                    text = renderInline(block.text),
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
@@ -292,7 +292,7 @@ private fun parseMarkdownLite(source: String): List<MdBlock> {
                 }
                 out += MdBlock.Code(code.toString().trimEnd('\n'), lang)
             }
-            line.startsWith("") && line.isNotBlank() && line.trimStart().startsWith("#") -> {
+            line.trimStart().startsWith("#") -> {
                 flush()
                 out += MdBlock.Heading(line.trimStart('#').trim())
             }
@@ -310,7 +310,7 @@ private fun parseMarkdownLite(source: String): List<MdBlock> {
 
 /** Renders `inline code` and **bold** spans. */
 @Composable
-private fun inline(text: String): AnnotatedString = buildAnnotatedString {
+private fun renderInline(text: String): AnnotatedString = buildAnnotatedString {
     val colors = HarnessTheme
     var idx = 0
     while (idx < text.length) {
