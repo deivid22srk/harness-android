@@ -10,7 +10,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -28,8 +27,20 @@ class MainActivity : ComponentActivity() {
         maybeRequestNotificationPermission()
 
         setContent {
-            dev.harness.ui.theme.HarnessThemeProvider {
-                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+            // Resolve the theme from the user preference (system/light/dark).
+            val darkTheme = when (uiState.themeMode) {
+                "light" -> false
+                "dark" -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            dev.harness.ui.theme.HarnessThemeProvider(
+                darkTheme = darkTheme,
+                dynamicColor = uiState.dynamicColor,
+                fontScale = uiState.fontScale,
+            ) {
                 HarnessRoot(
                     uiState = uiState,
                     viewModel = viewModel,
@@ -47,16 +58,10 @@ class MainActivity : ComponentActivity() {
 
     private fun openBatterySettings() {
         runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                startActivity(
-                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                        .setData(android.net.Uri.parse("package:$packageName")),
-                )
-            }
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(android.net.Uri.parse("package:$packageName")),
+            )
         }
-    }
-
-    override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
     }
 }
