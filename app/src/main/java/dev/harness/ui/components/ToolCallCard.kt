@@ -199,6 +199,15 @@ private fun StatusDot(status: ToolStatus) {
     }
 }
 
+/** Non-text status colors (dots); text uses [toolStatusTextColor] for AA. */
+@Composable
+private fun toolStatusColor(status: ToolStatus): Color = when (status) {
+    ToolStatus.Running -> HarnessTheme.toolRunning
+    ToolStatus.Ok -> HarnessTheme.toolOk
+    ToolStatus.Error -> HarnessTheme.toolError
+    ToolStatus.Cancelled -> HarnessTheme.textTertiary
+}
+
 /** Text-safe status colors (AA); dots still use [toolStatusColor]. */
 @Composable
 private fun toolStatusTextColor(status: ToolStatus): Color = when (status) {
