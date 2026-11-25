@@ -243,6 +243,16 @@ class PackagesViewModel(private val app: Application) : ViewModel() {
                         )
                     }
                     refresh()
+                    // Per-package summary after batch operations (§ round-04 P2).
+                    viewModelScope.launch {
+                        val total = manager.listInstalled(_ui.value.project?.hostPath).size
+                        _ui.value = _ui.value.copy(
+                            operation = _ui.value.operation?.copy(
+                                log = _ui.value.operation?.log.orEmpty() +
+                                    listOf("Estado declarado: $total pacote(s)"),
+                            ),
+                        )
+                    }
                     onDone()
                 }
             }
@@ -257,9 +267,16 @@ class PackagesViewModel(private val app: Application) : ViewModel() {
         opJob = null
         _ui.value = _ui.value.copy(
             operation = _ui.value.operation?.copy(running = false, exitCode = -1),
-            error = "Operação cancelada. O estado dos pacotes será revalidado.",
+            error = "Operação cancelada. O estado declarado está sendo revalidado…",
         )
         refresh()
+        // Explicit post-cancel report (round-04 P2.3): state after revalidate.
+        viewModelScope.launch {
+            val total = manager.listInstalled(_ui.value.project?.hostPath).size
+            _ui.value = _ui.value.copy(
+                error = "Operação cancelada. Estado revalidado: $total pacote(s) declarado(s).",
+            )
+        }
     }
 
     // ------------------------------------------------------------------

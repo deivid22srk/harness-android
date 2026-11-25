@@ -255,7 +255,8 @@ private fun SessionList(
                             .fillMaxWidth()
                             .clip(Radii.shapeLg)
                             .background(colors.toolErrorContainer)
-                            .padding(horizontal = Space.lg),
+                            .padding(horizontal = Space.lg)
+                            .semantics { contentDescription = "Excluir ${summary.title}" },
                         contentAlignment = Alignment.CenterEnd,
                     ) {
                         Icon(
@@ -436,5 +437,76 @@ private fun relativeDate(timestampMs: Long): String {
         minutes < 60 * 24 -> stringResource(R.string.time_hours, minutes / 60)
         minutes < 60L * 24 * 30 -> stringResource(R.string.time_days, minutes / (60 * 24))
         else -> stringResource(R.string.time_months, minutes / (60L * 24 * 30))
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Previews: dark + light + large font (PROMPT §2 rule 2)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun SessionRowSample() {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SessionRow(
+            summary = dev.harness.core.sessions.SessionSummary(
+                file = "/x/2026-11-20T10-00-00-000Z_a.jsonl",
+                sessionId = "aaaa",
+                name = "Correção de login",
+                firstUserText = "Corrija o bug de login",
+                messageCount = 12,
+                model = "anthropic/claude-sonnet-4-5",
+                updatedAt = System.currentTimeMillis() - 3_600_000,
+                truncated = false,
+                corrupt = false,
+            ),
+            isActive = true,
+            onOpen = {},
+            onRename = {},
+            onDelete = {},
+            onDuplicate = {},
+        )
+        SessionRow(
+            summary = dev.harness.core.sessions.SessionSummary(
+                file = "/x/2026-11-19T09-00-00-000Z_b.jsonl",
+                sessionId = "bbbb",
+                name = null,
+                firstUserText = "Explique este código",
+                messageCount = 4,
+                model = "google/gemini-2.5-pro",
+                updatedAt = System.currentTimeMillis() - 86_400_000,
+                truncated = false,
+                corrupt = false,
+            ),
+            isActive = false,
+            onOpen = {},
+            onRename = {},
+            onDelete = {},
+            onDuplicate = {},
+        )
+    }
+}
+
+@Preview(name = "Escuro", showBackground = true, backgroundColor = 0xFF0B0E14, widthDp = 360)
+@Composable
+private fun SessionRowsDarkPreview() {
+    dev.harness.ui.theme.HarnessThemeProvider(darkTheme = true, dynamicColor = false, fontScale = 1f) {
+        MaterialTheme { SessionRowSample() }
+    }
+}
+
+@Preview(name = "Claro", showBackground = true, backgroundColor = 0xFFF7F8FB, widthDp = 360)
+@Composable
+private fun SessionRowsLightPreview() {
+    dev.harness.ui.theme.HarnessThemeProvider(darkTheme = false, dynamicColor = false, fontScale = 1f) {
+        MaterialTheme { SessionRowSample() }
+    }
+}
+
+@Preview(name = "Fonte grande", showBackground = true, backgroundColor = 0xFF0B0E14, widthDp = 360, fontScale = 1.4f)
+@Composable
+private fun SessionRowsLargeFontPreview() {
+    dev.harness.ui.theme.HarnessThemeProvider(darkTheme = true, dynamicColor = false, fontScale = 1.3f) {
+        MaterialTheme { SessionRowSample() }
     }
 }

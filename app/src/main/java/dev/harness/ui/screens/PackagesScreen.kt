@@ -170,39 +170,11 @@ fun PackagesScreen(
                         onRetry = packagesViewModel::refresh,
                     )
                 } else {
-                    HSectionTitle(stringResource(R.string.packages_global_title))
-                    if (packagesState.global.isEmpty()) {
-                        Text(
-                            stringResource(R.string.packages_empty_global),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary,
-                        )
-                    } else {
-                        packagesState.global.forEach { pkg ->
-                            PackageRow(
-                                pkg = pkg,
-                                onRemove = { removeTarget = pkg },
-                                onUpdate = { packagesViewModel.updatePackage(pkg, onDone = {}) },
-                            )
-                        }
-                    }
-
-                    HSectionTitle(stringResource(R.string.packages_project_title))
-                    if (packagesState.projectPackages.isEmpty()) {
-                        Text(
-                            stringResource(R.string.packages_empty_project),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary,
-                        )
-                    } else {
-                        packagesState.projectPackages.forEach { pkg ->
-                            PackageRow(
-                                pkg = pkg,
-                                onRemove = { removeTarget = pkg },
-                                onUpdate = { packagesViewModel.updatePackage(pkg, onDone = {}) },
-                            )
-                        }
-                    }
+                    InstalledPackagesSection(
+                        packagesState = packagesState,
+                        onRemove = { removeTarget = it },
+                        onUpdateOne = { packagesViewModel.updatePackage(it, onDone = {}) },
+                    )
 
                     // ------------------------------------------------ Install
                     HSectionTitle(stringResource(R.string.packages_install_title))
@@ -242,85 +214,20 @@ fun PackagesScreen(
 
                     // ------------------------------------------------ Explorer
                     HSectionTitle(stringResource(R.string.packages_explore_title))
-                    Text(
-                        stringResource(R.string.packages_explore_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textTertiary,
+                    ExplorerSection(
+                        search = packagesState.search,
+                        viewModel = packagesViewModel,
+                        onUse = { sourceDraft = it },
                     )
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Space.sm),
-                    ) {
-                        HTextField(
-                            value = packagesState.search.query,
-                            onValueChange = packagesViewModel::setSearchQuery,
-                            label = stringResource(R.string.packages_search_label),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        HButton(
-                            text = stringResource(R.string.packages_search_action),
-                            onClick = { packagesViewModel.search() },
-                            icon = Icons.Default.Search,
-                        )
-                    }
-                    packagesState.search.error?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = colors.toolErrorText)
-                        HButton(
-                            text = stringResource(R.string.action_retry),
-                            onClick = { packagesViewModel.search() },
-                            variant = HButtonDefaults.Variant.Secondary,
-                        )
-                    }
-                    if (packagesState.search.loading) {
-                        LoadingPackages()
-                    } else {
-                        packagesState.search.results.forEach { result ->
-                            SearchResultRow(
-                                name = result.name,
-                                version = result.version,
-                                description = result.description,
-                                publisher = result.publisher,
-                                downloads = result.monthlyDownloads,
-                                date = result.date,
-                                features = result.features,
-                                onUse = { sourceDraft = result.installCommand },
-                            )
-                        }
-                        if (packagesState.search.hasMore) {
-                            HButton(
-                                text = stringResource(R.string.packages_load_more),
-                                onClick = packagesViewModel::loadMore,
-                                variant = HButtonDefaults.Variant.Ghost,
-                            )
-                        }
-                    }
 
                     // --------------------------------------------- Operation log
                     packagesState.operation?.let { op ->
                         HSectionTitle(stringResource(R.string.packages_log_title))
-                        CollapsibleSection(title = opLabel(op, stringResource(R.string.packages_running))) {
-                            HCodeBlock(
-                                code = op.log.takeLast(80).joinToString("\n").ifBlank { stringResource(R.string.packages_log_empty) },
-                                language = "log",
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                                if (op.running) {
-                                    HButton(
-                                        text = stringResource(R.string.packages_cancel),
-                                        onClick = packagesViewModel::cancelOperation,
-                                        variant = HButtonDefaults.Variant.Danger,
-                                    )
-                                }
-                                HButton(
-                                    text = stringResource(R.string.settings_copy_diagnostics),
-                                    onClick = { clipboard.setText(AnnotatedString(op.log.joinToString("\n"))) },
-                                    variant = HButtonDefaults.Variant.Secondary,
-                                )
-                            }
-                        }
+                        OperationLogCard(
+                            operation = op,
+                            onCancel = packagesViewModel::cancelOperation,
+                            onCopy = { clipboard.setText(AnnotatedString(it)) },
+                        )
                     }
 
                     packagesState.error?.let { err ->
@@ -470,6 +377,136 @@ private fun opLabel(op: dev.harness.core.pi.PackageOperation, runningLabel: Stri
 }
 
 @Composable
+internal fun InstalledPackagesSection(
+    packagesState: PackagesUiState,
+    onRemove: (InstalledPackage) -> Unit,
+    onUpdateOne: (InstalledPackage) -> Unit,
+) {
+    val colors = HarnessTheme
+    if (packagesState.global.isNotEmpty() || packagesState.projectPackages.isNotEmpty()) {
+        HSectionTitle(stringResource(R.string.packages_global_title))
+        if (packagesState.global.isEmpty()) {
+            Text(
+                stringResource(R.string.packages_empty_global),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary,
+            )
+        } else {
+            packagesState.global.forEach { pkg ->
+                PackageRow(pkg = pkg, onRemove = { onRemove(pkg) }, onUpdate = { onUpdateOne(pkg) })
+            }
+        }
+        HSectionTitle(stringResource(R.string.packages_project_title))
+        if (packagesState.projectPackages.isEmpty()) {
+            Text(
+                stringResource(R.string.packages_empty_project),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary,
+            )
+        } else {
+            packagesState.projectPackages.forEach { pkg ->
+                PackageRow(pkg = pkg, onRemove = { onRemove(pkg) }, onUpdate = { onUpdateOne(pkg) })
+            }
+        }
+    }
+}
+
+/** Explorer with pagination ("Carregar mais") and a retry dedicated to errors. */
+@Composable
+internal fun ExplorerSection(
+    search: dev.harness.PackageSearchState,
+    viewModel: PackagesViewModel,
+    onUse: (String) -> Unit,
+) {
+    val colors = HarnessTheme
+    Text(
+        stringResource(R.string.packages_explore_note),
+        style = MaterialTheme.typography.bodySmall,
+        color = colors.textTertiary,
+    )
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        HTextField(
+            value = search.query,
+            onValueChange = viewModel::setSearchQuery,
+            label = stringResource(R.string.packages_search_label),
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        HButton(
+            text = stringResource(R.string.packages_search_action),
+            onClick = { viewModel.search() },
+            icon = Icons.Default.Search,
+        )
+    }
+    search.error?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = colors.toolErrorText)
+        HButton(
+            text = stringResource(R.string.action_retry),
+            onClick = { viewModel.search() },
+            variant = HButtonDefaults.Variant.Secondary,
+        )
+    }
+    if (search.loading) {
+        LoadingPackages()
+    } else {
+        search.results.forEach { result ->
+            SearchResultRow(
+                name = result.name,
+                version = result.version,
+                description = result.description,
+                publisher = result.publisher,
+                downloads = result.monthlyDownloads,
+                date = result.date,
+                features = result.features,
+                onUse = { onUse(result.installCommand) },
+            )
+        }
+        if (search.hasMore) {
+            HButton(
+                text = stringResource(R.string.packages_load_more),
+                onClick = viewModel::loadMore,
+                variant = HButtonDefaults.Variant.Ghost,
+            )
+        }
+    }
+}
+
+/** Live op log with cancel + copy (§5.3.2). */
+@Composable
+internal fun OperationLogCard(
+    operation: dev.harness.core.pi.PackageOperation,
+    onCancel: () -> Unit,
+    onCopy: (String) -> Unit,
+) {
+    CollapsibleSection(title = opLabel(operation, stringResource(R.string.packages_running))) {
+        HCodeBlock(
+            code = operation.log.takeLast(80).joinToString("\n").ifBlank { stringResource(R.string.packages_log_empty) },
+            language = "log",
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            if (operation.running) {
+                HButton(
+                    text = stringResource(R.string.packages_cancel),
+                    onClick = onCancel,
+                    variant = HButtonDefaults.Variant.Danger,
+                )
+            }
+            HButton(
+                text = stringResource(R.string.settings_copy_diagnostics),
+                onClick = { onCopy(operation.log.joinToString("\n")) },
+                variant = HButtonDefaults.Variant.Secondary,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun opLabel(
 private fun PackageRow(
     pkg: InstalledPackage,
     onRemove: () -> Unit,
@@ -653,5 +690,67 @@ private fun LoadingPackages() {
         repeat(3) {
             HSkeleton(height = 20.dp, modifier = Modifier.fillMaxWidth(0.8f))
         }
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Previews: dark + light + large font (PROMPT §2 rule 2)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun PackageRowSample() {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PackageRow(
+            pkg = InstalledPackage(
+                source = "npm:cc-safety-net@2.8.3",
+                scope = dev.harness.core.pi.PackageScope.GLOBAL,
+                kind = dev.harness.core.pi.PackageKind.NPM,
+                identity = "cc-safety-net",
+                ref = "2.8.3",
+                pinned = true,
+                features = setOf(PackageFeature.EXTENSIONS),
+                description = "Block destructive commands",
+            ),
+            onRemove = {},
+            onUpdate = {},
+        )
+        PackageRow(
+            pkg = InstalledPackage(
+                source = "git:github.com/example/pi-tools",
+                scope = dev.harness.core.pi.PackageScope.PROJECT,
+                kind = dev.harness.core.pi.PackageKind.GIT,
+                identity = "pi-tools",
+                ref = null,
+                pinned = false,
+                features = setOf(PackageFeature.SKILLS, PackageFeature.PROMPTS),
+            ),
+            onRemove = {},
+            onUpdate = {},
+        )
+    }
+}
+
+@Preview(name = "Escuro", showBackground = true, backgroundColor = 0xFF0B0E14, widthDp = 360)
+@Composable
+private fun PackageRowsDarkPreview() {
+    dev.harness.ui.theme.HarnessThemeProvider(darkTheme = true, dynamicColor = false, fontScale = 1f) {
+        MaterialTheme { PackageRowSample() }
+    }
+}
+
+@Preview(name = "Claro", showBackground = true, backgroundColor = 0xFFF7F8FB, widthDp = 360)
+@Composable
+private fun PackageRowsLightPreview() {
+    dev.harness.ui.theme.HarnessThemeProvider(darkTheme = false, dynamicColor = false, fontScale = 1f) {
+        MaterialTheme { PackageRowSample() }
+    }
+}
+
+@Preview(name = "Fonte grande", showBackground = true, backgroundColor = 0xFF0B0E14, widthDp = 360, fontScale = 1.4f)
+@Composable
+private fun PackageRowsLargeFontPreview() {
+    dev.harness.ui.theme.HarnessThemeProvider(darkTheme = true, dynamicColor = false, fontScale = 1.3f) {
+        MaterialTheme { PackageRowSample() }
     }
 }

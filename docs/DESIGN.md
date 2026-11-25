@@ -253,3 +253,15 @@ Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
   funcionam em cold start e `onNewIntent` (setIntent + LaunchedEffect);
   entregas fora desses caminhos dependem de recomposição — aceitável na
   arquitetura sem biblioteca de navegação.
+
+## 13. Rodada 5 — refinamentos finais
+
+- `PackageDeclaredCodec` (`core/pi/`): codec puro do estado declarado (strings
+  e objetos {source}) + recursos por `package.json`/pastas — testável sem
+  Android; `PiPackageManager` delega nele.
+- `PackagesScreen` decomposta em `InstalledPackagesSection` /
+  `ExplorerSection` / `OperationLogCard` (composables internos reutilizáveis).
+- Resumo pós-operação: "Estado declarado: N pacote(s)" entra no log ao final
+  de cada operação e após cancelamento (estado revalidado explícito).
+- Previews (escuro/claro/fonte grande) para `PackageRow` e `SessionRow`.
+- A11y: fundo do swipe com description dedicada ("Excluir <título>").

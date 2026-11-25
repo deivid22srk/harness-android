@@ -141,75 +141,13 @@ class PiPackageManager(
     }
 
     private fun readDeclared(file: File, scope: PackageScope, out: MutableList<InstalledPackage>) {
-        val obj = runCatching {
-            json.parseToJsonElement(file.readText()) as? JsonObject
-        }.getOrNull() ?: return
-        val packages = obj["packages"] as? kotlinx.serialization.json.JsonArray ?: return
-        for (el in packages) {
-            when (el) {
-                is JsonPrimitive -> out += buildPackage(el.content, scope)
-                is JsonObject -> {
-                    val source = (el["source"] as? JsonPrimitive)?.content ?: continue
-                    out += buildPackage(source, scope)
-                }
-                else -> Unit
-            }
-        }
-    }
-
-    /** Parses `npm:name[@ver]`, `git:...[@ref]`, `https://...` and local paths. */
-    fun buildPackage(source: String, scope: PackageScope): InstalledPackage {
-        val (kind, identity, ref) = parseSource(source)
-        val pinned = ref != null
-        val dir = installDirOf(kind, identity)
-        val meta = dir?.let { readPackageMeta(it) }
-        return InstalledPackage(
-            source = source,
-            scope = scope,
-            kind = kind,
-            identity = identity,
-            ref = ref,
-            pinned = pinned,
-            features = meta?.features ?: emptySet(),
-            description = meta?.description,
-            installPath = dir?.absolutePath,
-        )
+        val npmModules = File(npmDir, "node_modules")
+        out += PackageDeclaredCodec.buildList(PackageDeclaredCodec.readFile(file), scope, npmModules, gitDir)
     }
 
     data class ParsedSource(val kind: PackageKind, val identity: String, val ref: String?)
 
     fun parseSource(source: String): ParsedSource = PackageSources.parse(source)
-
-    private fun installDirOf(kind: PackageKind, identity: String): File? = when (kind) {
-        PackageKind.NPM -> File(File(npmDir, "node_modules"), identity)
-        PackageKind.GIT -> File(gitDir, identity.replace(Regex("[^A-Za-z0-9._-]"), "-"))
-        else -> null
-    }
-
-    private class PackageMeta(val features: Set<PackageFeature>, val description: String?)
-
-    /** Reads `pi` manifest key and conventional dirs from the installed copy. */
-    private fun readPackageMeta(dir: File): PackageMeta? {
-        if (!dir.exists()) return null
-        val manifest = runCatching {
-            json.parseToJsonElement(File(dir, "package.json").readText()) as? JsonObject
-        }.getOrNull()
-        val description = (manifest?.get("description") as? JsonPrimitive)?.content
-        val features = LinkedHashSet<PackageFeature>()
-        (manifest?.get("pi") as? JsonObject)?.let { pi ->
-            if (pi.containsKey("extensions")) features += PackageFeature.EXTENSIONS
-            if (pi.containsKey("skills")) features += PackageFeature.SKILLS
-            if (pi.containsKey("prompts")) features += PackageFeature.PROMPTS
-            if (pi.containsKey("themes")) features += PackageFeature.THEMES
-        }
-        if (features.isEmpty()) {
-            if (File(dir, "extensions").isDirectory) features += PackageFeature.EXTENSIONS
-            if (File(dir, "skills").isDirectory) features += PackageFeature.SKILLS
-            if (File(dir, "prompts").isDirectory) features += PackageFeature.PROMPTS
-            if (File(dir, "themes").isDirectory) features += PackageFeature.THEMES
-        }
-        return PackageMeta(features, description)
-    }
 
     // ------------------------------------------------------------------
     // Mutations (run the real pi CLI inside PRoot, streaming output)
