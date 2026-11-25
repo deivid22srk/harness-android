@@ -41,8 +41,10 @@ object ProcessRunner {
         env: Map<String, String>,
         workDir: File = File("/"),
         onLine: ((String) -> Unit)? = null,
+        onStarted: ((Process) -> Unit)? = null,
     ): Result {
         val running = start(argv, env, workDir, mergeStderr = true)
+        onStarted?.invoke(running.process)
         val output = StringBuilder()
         running.process.inputStream.bufferedReader().useLines { lines ->
             lines.forEach { line ->

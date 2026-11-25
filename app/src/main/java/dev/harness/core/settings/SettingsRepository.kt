@@ -1,7 +1,27 @@
 package dev.harness.core.settings
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import dev.harness.core.keys.SecretStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * Provider catalogue for the MVP: API-key authentication, injected as
@@ -23,7 +43,8 @@ data class Provider(
     val baseUrl: String? = null,
 )
 
-/** A user-defined provider stored in preferences. */
+/** A user-defined provider stored in settings (DataStore, JSON-encoded). */
+@Serializable
 data class CustomProvider(
     val id: String,
     val label: String,
@@ -58,88 +79,90 @@ object Providers {
     fun byId(id: String): Provider? = ALL.firstOrNull { it.id == id }
 }
 
-/** Non-secret, user-visible preferences. */
+/**
+ * Typed persistence of user preferences backed by **Jetpack DataStore**
+ * (PROMPT §6.2): immutable [AppSettings] model, explicit defaults, one-shot
+ * migration from the legacy SharedPreferences file — **without ever touching
+ * the API keys**, which live in the Keystore-backed [SecretStore].
+ *
+ * Call sites read synchronously (an in-memory snapshot hydrated in `init`)
+ * and write through suspend-backed setters that update the snapshot first
+ * and persist asynchronously — keeping the existing ViewModels unchanged
+ * while the durable storage becomes typed and schema-friendly.
+ */
 class SettingsRepository(context: Context) {
-    private val prefs = context.getSharedPreferences("harness_settings", Context.MODE_PRIVATE)
-    val secrets = SecretStore(context)
 
-    var provider: String
-        get() = prefs.getString(KEY_PROVIDER, "anthropic") ?: "anthropic"
-        set(v) = prefs.edit().putString(KEY_PROVIDER, v).apply()
+    private val appContext = context.applicationContext
+    private val json = Json { ignoreUnknownKeys = true }
 
-    var model: String
-        get() = prefs.getString(KEY_MODEL, "") ?: ""
-        set(v) = prefs.edit().putString(KEY_MODEL, v).apply()
+    val secrets = SecretStore(appContext)
 
-    var thinking: String
-        get() = prefs.getString(KEY_THINKING, "medium") ?: "medium"
-        set(v) = prefs.edit().putString(KEY_THINKING, v).apply()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutex = Mutex()
 
-    var themeMode: String
-        get() = prefs.getString(KEY_THEME, "system") ?: "system"
-        set(v) = prefs.edit().putString(KEY_THEME, v).apply()
+    @Volatile
+    private var snap: AppSettings = AppSettings()
 
-    /** Material You dynamic palette (API 31+); falls back to brand colors. */
-    var dynamicColor: Boolean
-        get() = prefs.getBoolean(KEY_DYNAMIC, false)
-        set(v) = prefs.edit().putBoolean(KEY_DYNAMIC, v).apply()
+    /** Current typed snapshot (already includes migrated values). */
+    val current: AppSettings get() = snap
 
-    /** User font-size multiplier applied on top of the system font scale. */
-    var fontScale: Float
-        get() = prefs.getFloat(KEY_FONT_SCALE, 1f)
-        set(v) = prefs.edit().putFloat(KEY_FONT_SCALE, v).apply()
+    private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "harness_settings")
+    private val store = appContext.dataStore
 
-    var onboardingDone: Boolean
-        get() = prefs.getBoolean(KEY_ONBOARDED, false)
-        set(v) = prefs.edit().putBoolean(KEY_ONBOARDED, v).apply()
-
-    var batteryPromptShown: Boolean
-        get() = prefs.getBoolean(KEY_BATTERY_PROMPT, false)
-        set(v) = prefs.edit().putBoolean(KEY_BATTERY_PROMPT, v).apply()
-
-    // ---------------------------------------------------------------------
-    // Custom providers
-    // ---------------------------------------------------------------------
-
-    /** All providers (built-in + custom), as seen by the settings UI. */
-    fun allProviders(): List<Provider> = Providers.ALL + customProviders().map { it.asProvider() }
-
-    fun providerById(id: String): Provider? = allProviders().firstOrNull { it.id == id }
-
-    fun customProviders(): List<CustomProvider> {
-        val raw = prefs.getString(KEY_CUSTOM_PROVIDERS, null) ?: return emptyList()
-        return decodeCustom(raw)
+    init {
+        snap = runBlocking { loadWithMigration() }
     }
 
-    fun addCustomProvider(provider: CustomProvider) {
-        val list = customProviders().filterNot { it.id == provider.id } + provider
-        prefs.edit().putString(KEY_CUSTOM_PROVIDERS, encodeCustom(list)).apply()
-    }
+    // ------------------------------------------------------------------
+    // Load + migration
+    // ------------------------------------------------------------------
 
-    fun removeCustomProvider(id: String) {
-        val list = customProviders().filterNot { it.id == id }
-        prefs.edit().putString(KEY_CUSTOM_PROVIDERS, encodeCustom(list)).apply()
-        secrets.put(envVarFor(id), "")
-    }
-
-    private fun envVarFor(id: String): String =
-        "HARNESS_KEY_" + id.uppercase().replace(Regex("[^A-Z0-9]"), "_")
-
-    private fun CustomProvider.asProvider() = Provider(
-        id = id,
-        label = label,
-        envVar = envVar,
-        keyHint = "chave do provedor",
-        api = api,
-        baseUrl = baseUrl,
-    )
-
-    private fun encodeCustom(list: List<CustomProvider>): String =
-        list.joinToString("\u0001") {
-            listOf(it.id, it.label, it.baseUrl, it.api, it.envVar, it.models).joinToString("\u0002")
+    private suspend fun loadWithMigration(): AppSettings = mutex.withLock {
+        val stored = store.data.first()
+        val migratedVersion = stored[KEY_MIGRATED_VERSION] ?: 0
+        if (migratedVersion >= MIGRATION_VERSION) {
+            return@withLock decodeSettings(stored)
         }
+        // First run on the new storage: import the legacy SharedPreferences
+        // (values that exist; anything absent keeps the typed default).
+        val legacy = appContext.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
+        val imported = buildFromLegacy(legacy)
+        store.edit {
+            it.clear()
+            writeSettings(it, imported)
+            it[KEY_MIGRATED] = true
+            it[KEY_MIGRATED_VERSION] = MIGRATION_VERSION
+        }
+        // Clear the legacy file so stale values can never resurface. API keys
+        // are in SecretStore, not here — nothing is lost.
+        legacy.edit().clear().commit()
+        imported
+    }
 
-    private fun decodeCustom(raw: String): List<CustomProvider> {
+    private fun buildFromLegacy(prefs: android.content.SharedPreferences): AppSettings {
+        val selected = HashMap<String, List<String>>()
+        for (p in Providers.ALL) {
+            val raw = prefs.getString("selected_models_" + p.id, null) ?: continue
+            selected[p.id] = raw.split('\n').filter { it.isNotBlank() }
+        }
+        val customRaw = prefs.getString("custom_providers", null)
+        return AppSettings(
+            provider = prefs.getString("provider", null) ?: "anthropic",
+            model = prefs.getString("model", null) ?: "",
+            thinking = prefs.getString("thinking", null) ?: "medium",
+            themeMode = ThemeMode.fromId(prefs.getString("theme", null).orEmpty()),
+            dynamicColor = prefs.getBoolean("dynamic_color", false),
+            fontScale = prefs.getFloat("font_scale", 1f),
+            resumeLastSession = prefs.getBoolean("resume_last_session", true),
+            onboardingDone = prefs.getBoolean("onboarded", false),
+            batteryPromptShown = prefs.getBoolean("battery_prompt_shown", false),
+            customProviders = customRaw?.let(::decodeLegacyCustom).orEmpty(),
+            selectedModels = selected,
+        )
+    }
+
+    /** Decodes the legacy \u0001/\u0002 custom-provider encoding. */
+    private fun decodeLegacyCustom(raw: String): List<CustomProvider> {
         if (raw.isBlank()) return emptyList()
         return raw.split('\u0001').mapNotNull { entry ->
             val parts = entry.split('\u0002')
@@ -155,25 +178,173 @@ class SettingsRepository(context: Context) {
         }
     }
 
+    private fun decodeSettings(prefs: Preferences): AppSettings {
+        val selected = prefs[KEY_SELECTED_MODELS]
+            ?.mapNotNull { entry ->
+                val idx = entry.indexOf('=')
+                if (idx <= 0) null else entry.take(idx) to entry.substring(idx + 1).split('\n').filter { it.isNotBlank() }
+            }
+            ?.toMap()
+            .orEmpty()
+        return AppSettings(
+            provider = prefs[KEY_PROVIDER] ?: "anthropic",
+            model = prefs[KEY_MODEL] ?: "",
+            thinking = prefs[KEY_THINKING] ?: "medium",
+            themeMode = ThemeMode.fromId(prefs[KEY_THEME].orEmpty()),
+            dynamicColor = prefs[KEY_DYNAMIC] ?: false,
+            fontScale = prefs[KEY_FONT_SCALE] ?: 1f,
+            resumeLastSession = prefs[KEY_RESUME_SESSION] ?: true,
+            onboardingDone = prefs[KEY_ONBOARDED] ?: false,
+            batteryPromptShown = prefs[KEY_BATTERY_PROMPT] ?: false,
+            steeringMode = prefs[KEY_STEERING_MODE] ?: "one-at-a-time",
+            followUpMode = prefs[KEY_FOLLOW_UP_MODE] ?: "one-at-a-time",
+            customProviders = prefs[KEY_CUSTOM_PROVIDERS]?.let { raw ->
+                runCatching { json.decodeFromString<List<CustomProvider>>(raw) }.getOrDefault(emptyList())
+            }.orEmpty(),
+            selectedModels = selected,
+        )
+    }
+
+    private fun writeSettings(target: androidx.datastore.preferences.core.MutablePreferences, value: AppSettings) {
+        target[KEY_PROVIDER] = value.provider
+        target[KEY_MODEL] = value.model
+        target[KEY_THINKING] = value.thinking
+        target[KEY_THEME] = value.themeMode.id
+        target[KEY_DYNAMIC] = value.dynamicColor
+        target[KEY_FONT_SCALE] = value.fontScale
+        target[KEY_RESUME_SESSION] = value.resumeLastSession
+        target[KEY_ONBOARDED] = value.onboardingDone
+        target[KEY_BATTERY_PROMPT] = value.batteryPromptShown
+        target[KEY_STEERING_MODE] = value.steeringMode
+        target[KEY_FOLLOW_UP_MODE] = value.followUpMode
+        target[KEY_CUSTOM_PROVIDERS] = json.encodeToString(value.customProviders)
+        target[KEY_SELECTED_MODELS] = value.selectedModels.map { (k, v) -> "$k=${v.joinToString("\n")}" }.toSet()
+    }
+
+    /** Updates the snapshot immediately and persists asynchronously. */
+    private fun update(transform: (AppSettings) -> AppSettings) {
+        val next = transform(snap)
+        snap = next
+        scope.launch {
+            mutex.withLock {
+                store.edit { writeSettings(it, snap) }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Typed accessors (sync facade over the snapshot)
+    // ------------------------------------------------------------------
+
+    var provider: String
+        get() = snap.provider
+        set(v) = update { it.copy(provider = v) }
+
+    var model: String
+        get() = snap.model
+        set(v) = update { it.copy(model = v) }
+
+    var thinking: String
+        get() = snap.thinking
+        set(v) = update { it.copy(thinking = v) }
+
+    /** Theme id ("system" | "light" | "dark") for the existing UI call sites. */
+    var themeMode: String
+        get() = snap.themeMode.id
+        set(v) = update { it.copy(themeMode = ThemeMode.fromId(v)) }
+
+    var dynamicColor: Boolean
+        get() = snap.dynamicColor
+        set(v) = update { it.copy(dynamicColor = v) }
+
+    var fontScale: Float
+        get() = snap.fontScale
+        set(v) = update { it.copy(fontScale = v) }
+
+    var resumeLastSession: Boolean
+        get() = snap.resumeLastSession
+        set(v) = update { it.copy(resumeLastSession = v) }
+
+    var autoScroll: Boolean
+        get() = snap.autoScroll
+        set(v) = update { it.copy(autoScroll = v) }
+
+    var renderMarkdown: Boolean
+        get() = snap.renderMarkdown
+        set(v) = update { it.copy(renderMarkdown = v) }
+
+    var sendOnEnter: Boolean
+        get() = snap.sendOnEnter
+        set(v) = update { it.copy(sendOnEnter = v) }
+
+    var hapticFeedback: Boolean
+        get() = snap.hapticFeedback
+        set(v) = update { it.copy(hapticFeedback = v) }
+
+    var steeringMode: String
+        get() = snap.steeringMode
+        set(v) = update { it.copy(steeringMode = v) }
+
+    var followUpMode: String
+        get() = snap.followUpMode
+        set(v) = update { it.copy(followUpMode = v) }
+
+    var onboardingDone: Boolean
+        get() = snap.onboardingDone
+        set(v) = update { it.copy(onboardingDone = v) }
+
+    var batteryPromptShown: Boolean
+        get() = snap.batteryPromptShown
+        set(v) = update { it.copy(batteryPromptShown = v) }
+
+    // ---------------------------------------------------------------------
+    // Custom providers
+    // ---------------------------------------------------------------------
+
+    /** All providers (built-in + custom), as seen by the settings UI. */
+    fun allProviders(): List<Provider> = Providers.ALL + snap.customProviders.map { it.asProvider() }
+
+    fun providerById(id: String): Provider? = allProviders().firstOrNull { it.id == id }
+
+    fun customProviders(): List<CustomProvider> = snap.customProviders
+
+    fun addCustomProvider(provider: CustomProvider) {
+        update { it.copy(customProviders = it.customProviders.filterNot { c -> c.id == provider.id } + provider) }
+    }
+
+    fun removeCustomProvider(id: String) {
+        update { it.copy(customProviders = it.customProviders.filterNot { c -> c.id == id }) }
+        secrets.put(envVarFor(id), "")
+    }
+
+    private fun envVarFor(id: String): String =
+        "HARNESS_KEY_" + id.uppercase().replace(Regex("[^A-Z0-9]"), "_")
+
+    private fun CustomProvider.asProvider() = Provider(
+        id = id,
+        label = label,
+        envVar = envVar,
+        keyHint = "chave do provedor",
+        api = api,
+        baseUrl = baseUrl,
+    )
+
     // ---------------------------------------------------------------------
     // Selected models (per provider)
     // ---------------------------------------------------------------------
 
     /** Model IDs the user chose to keep for a provider; empty means "all". */
-    fun selectedModels(providerId: String): Set<String> {
-        val raw = prefs.getString(KEY_SELECTED_PREFIX + providerId, null) ?: return emptySet()
-        return raw.split('\n').filter { it.isNotBlank() }.toSet()
-    }
+    fun selectedModels(providerId: String): Set<String> =
+        snap.selectedModels[providerId]?.toSet().orEmpty()
 
     fun setSelectedModels(providerId: String, ids: Set<String>) {
-        prefs.edit().putString(KEY_SELECTED_PREFIX + providerId, ids.joinToString("\n")).apply()
+        update { it.copy(selectedModels = it.selectedModels + (providerId to ids.toList())) }
     }
 
-    fun hasModelSelection(providerId: String): Boolean =
-        prefs.contains(KEY_SELECTED_PREFIX + providerId)
+    fun hasModelSelection(providerId: String): Boolean = snap.selectedModels.containsKey(providerId)
 
     // ---------------------------------------------------------------------
-    // API keys
+    // API keys (Keystore-backed, never in DataStore)
     // ---------------------------------------------------------------------
 
     fun apiKey(providerId: String): String? {
@@ -198,15 +369,24 @@ class SettingsRepository(context: Context) {
     fun hasAnyKey(): Boolean = apiKeyEnv().isNotEmpty()
 
     private companion object {
-        const val KEY_PROVIDER = "provider"
-        const val KEY_MODEL = "model"
-        const val KEY_THINKING = "thinking"
-        const val KEY_THEME = "theme"
-        const val KEY_DYNAMIC = "dynamic_color"
-        const val KEY_FONT_SCALE = "font_scale"
-        const val KEY_ONBOARDED = "onboarded"
-        const val KEY_BATTERY_PROMPT = "battery_prompt_shown"
-        const val KEY_CUSTOM_PROVIDERS = "custom_providers"
-        const val KEY_SELECTED_PREFIX = "selected_models_"
-    }
+        const val LEGACY_PREFS = "harness_settings"
+        const val MIGRATION_VERSION = 1
+
+        val KEY_MIGRATED = booleanPreferencesKey("migrated_from_prefs")
+        val KEY_PROVIDER = stringPreferencesKey("provider")
+        val KEY_MODEL = stringPreferencesKey("model")
+        val KEY_THINKING = stringPreferencesKey("thinking")
+        val KEY_THEME = stringPreferencesKey("theme")
+        val KEY_DYNAMIC = booleanPreferencesKey("dynamic_color")
+        val KEY_FONT_SCALE = floatPreferencesKey("font_scale")
+        val KEY_RESUME_SESSION = booleanPreferencesKey("resume_last_session")
+        val KEY_ONBOARDED = booleanPreferencesKey("onboarded")
+        val KEY_BATTERY_PROMPT = booleanPreferencesKey("battery_prompt_shown")
+        val KEY_CUSTOM_PROVIDERS = stringPreferencesKey("custom_providers_json")
+        val KEY_SELECTED_MODELS = stringSetPreferencesKey("selected_models")
+        val KEY_MIGRATED_VERSION = intPreferencesKey("migrated_version")
+        val KEY_STEERING_MODE = stringPreferencesKey("steering_mode")
+        val KEY_FOLLOW_UP_MODE = stringPreferencesKey("follow_up_mode")
+
+}
 }

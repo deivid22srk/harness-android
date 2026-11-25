@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main, ui-redesign]
+    branches: [main, ui-redesign, feat/settings-sessions-packages]
     tags: ['v*']
   pull_request:
   workflow_dispatch:

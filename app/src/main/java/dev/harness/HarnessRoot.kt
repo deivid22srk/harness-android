@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.harness.R
 import dev.harness.core.rpc.ExtensionUiRequest
 import dev.harness.ui.components.HNoticeSnackbarHost
@@ -29,6 +30,7 @@ import dev.harness.ui.components.touchTargetClickable
 import dev.harness.ui.screens.ChatScreen
 import dev.harness.ui.screens.OnboardingScreen
 import dev.harness.ui.screens.ProjectsScreen
+import dev.harness.ui.screens.SessionsScreen
 import dev.harness.ui.screens.SettingsScreen
 import dev.harness.ui.theme.HarnessTheme
 import dev.harness.ui.theme.Radii
@@ -44,14 +46,32 @@ fun HarnessRoot(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
     onRequestBatteryExemption: () -> Unit,
+    wideScreen: Boolean = false,
 ) {
     val colors = HarnessTheme
     val snackbarHostState = remember { SnackbarHostState() }
+    val sessionsViewModel: SessionsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = SessionsViewModel.factory(viewModel.appForFactory()),
+    )
+    val sessionsState by sessionsViewModel.uiState.collectAsStateWithLifecycle()
+    val packagesViewModel: PackagesViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = PackagesViewModel.factory(viewModel.appForFactory()),
+    )
+    val packagesState by packagesViewModel.uiState.collectAsStateWithLifecycle()
 
-    BackHandler(enabled = uiState.screen == Screen.Settings || uiState.screen == Screen.Chat) {
+    BackHandler(
+        enabled = uiState.screen == Screen.Settings ||
+            uiState.screen == Screen.Chat ||
+            uiState.screen == Screen.Sessions,
+    ) {
         when (uiState.screen) {
-            Screen.Settings -> viewModel.backToProjects()
+            // Settings: back leaves the open category first (predictive back),
+            // then the screen.
+            Screen.Settings -> {
+                if (uiState.settingsSection != null) viewModel.backToSettingsHub() else viewModel.backToProjects()
+            }
             Screen.Chat -> viewModel.backToProjects()
+            Screen.Sessions -> viewModel.backFromSessions()
             else -> Unit
         }
     }
@@ -71,12 +91,24 @@ fun HarnessRoot(
             Screen.Settings -> SettingsScreen(
                 uiState = uiState,
                 viewModel = viewModel,
+                packagesViewModel = packagesViewModel,
+                packagesState = packagesState,
                 onBack = viewModel::backToProjects,
+                wideScreen = wideScreen,
             )
 
             Screen.Chat -> ChatScreen(
                 uiState = uiState,
                 viewModel = viewModel,
+                sessionsState = sessionsState,
+                sessionsViewModel = sessionsViewModel,
+            )
+
+            Screen.Sessions -> SessionsScreen(
+                sessionsState = sessionsState,
+                harnessState = uiState,
+                sessionsViewModel = sessionsViewModel,
+                harnessViewModel = viewModel,
             )
         }
 

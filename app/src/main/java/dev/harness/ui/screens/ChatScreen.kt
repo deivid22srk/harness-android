@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -70,6 +71,8 @@ import androidx.compose.ui.unit.dp
 import dev.harness.HarnessViewModel
 import dev.harness.HarnessUiState
 import dev.harness.R
+import dev.harness.SessionsUiState
+import dev.harness.SessionsViewModel
 import dev.harness.core.pi.ConnectionState
 import dev.harness.core.state.AgentStatus
 import dev.harness.core.state.ChatItem
@@ -81,9 +84,11 @@ import dev.harness.ui.components.HBottomSheet
 import dev.harness.ui.components.HButton
 import dev.harness.ui.components.HButtonDefaults
 import dev.harness.ui.components.HChip
+import dev.harness.ui.components.HDialog
 import dev.harness.ui.components.HEmptyState
 import dev.harness.ui.components.HIconButton
 import dev.harness.ui.components.HMarkdown
+import dev.harness.ui.components.HTextField
 import dev.harness.ui.components.ToolCallCard
 import dev.harness.ui.components.touchTargetClickable
 import dev.harness.ui.theme.HarnessTheme
@@ -100,6 +105,8 @@ private val MaxMessageWidth = 640.dp
 fun ChatScreen(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
+    sessionsState: SessionsUiState? = null,
+    sessionsViewModel: SessionsViewModel? = null,
 ) {
     val colors = HarnessTheme
     Column(
@@ -116,6 +123,13 @@ fun ChatScreen(
             onNewSession = viewModel::newSession,
             onSettings = viewModel::openSettings,
             onBack = viewModel::backToProjects,
+            onSessions = viewModel::openSessions,
+            onRenameSession = if (uiState.connection == ConnectionState.Connected) {
+                // Renaming goes through the Pi (set_session_name).
+                { name -> viewModel.renameActiveSession(name) }
+            } else {
+                null
+            },
         )
 
         val sessionError = uiState.chat.error
@@ -131,6 +145,8 @@ fun ChatScreen(
                 state = uiState.chat,
                 isBusy = uiState.chat.isBusy,
                 lastPrompt = viewModel.lastPromptForRegeneration(),
+                autoScroll = uiState.autoScroll,
+                renderMarkdown = uiState.renderMarkdown,
                 onRegenerate = viewModel::regenerate,
                 onEditResend = viewModel::requestEditResend,
                 onSuggestion = viewModel::send,
@@ -158,6 +174,8 @@ fun ChatScreen(
                     onOpenThinkingPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Thinking, true) },
                     onAttach = { viewModel.setPicker(HarnessViewModel.Pickers.Attach, true) },
                     onRemoveImage = viewModel::removePendingImage,
+                    sendOnEnter = uiState.sendOnEnter,
+                    hapticFeedback = uiState.hapticFeedback,
                 )
             }
         }
@@ -208,8 +226,11 @@ private fun ChatTopBar(
     onNewSession: () -> Unit,
     onSettings: () -> Unit,
     onBack: () -> Unit,
+    onSessions: () -> Unit,
+    onRenameSession: ((String) -> Unit)?,
 ) {
     val colors = HarnessTheme
+    var renameOpen by remember { mutableStateOf(false) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -228,7 +249,16 @@ private fun ChatTopBar(
                 onClick = onBack,
                 tint = colors.textPrimary,
             )
-            Column(Modifier.weight(1f).padding(horizontal = Space.xs)) {
+            val titleColumn = if (onRenameSession != null) {
+                // The session name is tappable to rename (acceptance §4.3).
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = Space.xs)
+                    .touchTargetClickable { renameOpen = true }
+            } else {
+                Modifier.weight(1f).padding(horizontal = Space.xs)
+            }
+            Column(titleColumn) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,
@@ -242,7 +272,7 @@ private fun ChatTopBar(
                 ) {
                     HBadge(text = connectionLabel(connection), color = connectionColor(connection))
                     Text(
-                        subtitle ?: "",
+                        subtitle ?: stringResource(R.string.sessions_untitled),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textSecondary,
                         maxLines = 1,
@@ -250,6 +280,11 @@ private fun ChatTopBar(
                     )
                 }
             }
+            HIconButton(
+                icon = Icons.Default.List,
+                contentDescription = stringResource(R.string.a11y_open_sessions),
+                onClick = onSessions,
+            )
             HIconButton(
                 icon = Icons.Default.Add,
                 contentDescription = stringResource(R.string.chat_new_session),
@@ -271,6 +306,29 @@ private fun ChatTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+
+    if (renameOpen && onRenameSession != null) {
+        var draft by remember { mutableStateOf(subtitle.orEmpty()) }
+        HDialog(
+            title = stringResource(R.string.sessions_rename_title),
+            onDismiss = { renameOpen = false },
+            confirmLabel = stringResource(R.string.action_confirm),
+            confirmEnabled = draft.isNotBlank(),
+            onConfirm = {
+                onRenameSession(draft)
+                renameOpen = false
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            text = {
+                HTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    label = stringResource(R.string.sessions_rename_label),
+                    singleLine = true,
+                )
+            },
+        )
     }
 }
 
@@ -336,6 +394,8 @@ fun ChatList(
     onEditResend: (String) -> Unit,
     onSuggestion: (String) -> Unit,
     modifier: Modifier = Modifier,
+    autoScroll: Boolean = true,
+    renderMarkdown: Boolean = true,
 ) {
     val listState = rememberLazyListState()
     var stuckToBottom by remember { mutableStateOf(true) }
@@ -348,9 +408,10 @@ fun ChatList(
     }
 
     // Re-scroll when items are added OR when the streaming tail grows.
+    // Gated by the "rolagem automática" setting (Configurações → Chat).
     val tailLength = (state.items.lastOrNull() as? ChatItem.AssistantMessage)?.text?.length ?: 0
     LaunchedEffect(state.items.size, tailLength, isBusy) {
-        if (stuckToBottom && state.items.isNotEmpty()) {
+        if (autoScroll && stuckToBottom && state.items.isNotEmpty()) {
             runCatching { listState.animateScrollToItem(state.items.lastIndex) }
         }
     }
@@ -400,6 +461,7 @@ fun ChatList(
                                 item,
                                 canRegenerate = lastPrompt != null && !isBusy && item == state.items.lastOrNull(),
                                 onRegenerate = onRegenerate,
+                                renderMarkdown = renderMarkdown,
                             )
                             is ChatItem.ToolGroup -> ToolGroupBlock(item)
                             is ChatItem.Notice -> NoticeRow(item)
@@ -478,6 +540,7 @@ private fun AssistantMessage(
     item: ChatItem.AssistantMessage,
     canRegenerate: Boolean,
     onRegenerate: () -> Unit,
+    renderMarkdown: Boolean = true,
 ) {
     val colors = HarnessTheme
     val clipboard = LocalClipboardManager.current
@@ -495,7 +558,15 @@ private fun AssistantMessage(
         }
         if (item.text.isNotBlank()) {
             SelectionContainer(modifier = Modifier.fillMaxWidth()) {
-                HMarkdown(item.text)
+                if (renderMarkdown) {
+                    HMarkdown(item.text)
+                } else {
+                    Text(
+                        item.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.textPrimary,
+                    )
+                }
             }
         }
         item.error?.let {

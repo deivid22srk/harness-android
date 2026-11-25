@@ -96,6 +96,12 @@ data class ChatState(
     val lastUsage: Usage? = null,
     val contextPercent: Int? = null,
     val error: String? = null,
+    /** Absolute guest path of the active session file (get_state). */
+    val sessionFile: String? = null,
+    /** Active session id (get_state). */
+    val sessionId: String? = null,
+    /** Message count reported by the Pi for the active session. */
+    val messageCount: Int? = null,
 ) {
     val isBusy: Boolean
         get() = status != AgentStatus.Idle
@@ -150,6 +156,30 @@ fun summarizeToolCall(call: ToolCall): String {
         "glob", "grep" -> pick("pattern", "query", "glob").orEmpty()
         else -> pick("path", "command", "pattern", "query", "name", "url").orEmpty()
     }
+}
+
+/**
+ * Cheap diff descriptor for `edit` tool calls, shared by the live reducer and
+ * the session hydrator so a restored card looks exactly like the live one.
+ */
+fun buildDiffSummary(toolName: String, args: kotlinx.serialization.json.JsonObject?): DiffSummary? {
+    if (args == null || toolName.lowercase() != "edit") return null
+    val path = (args["path"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+        ?: (args["filePath"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+        ?: return null
+    val old = (args["oldString"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+    val new = (args["newString"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+    if (old == null && new == null) {
+        return DiffSummary(path = path, added = 0, removed = 0, previewLines = emptyList())
+    }
+    val oldLines = old?.lines() ?: emptyList()
+    val newLines = new?.lines() ?: emptyList()
+    val preview = mutableListOf<DiffLine>()
+    preview += DiffLine(DiffLine.Kind.Header, "− antigo")
+    oldLines.take(12).forEach { preview += DiffLine(DiffLine.Kind.Removed, it) }
+    preview += DiffLine(DiffLine.Kind.Header, "+ novo")
+    newLines.take(12).forEach { preview += DiffLine(DiffLine.Kind.Added, it) }
+    return DiffSummary(path = path, added = newLines.size, removed = oldLines.size, previewLines = preview)
 }
 
 private fun jsonStr(el: kotlinx.serialization.json.JsonElement): String {

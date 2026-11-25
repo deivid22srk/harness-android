@@ -2,7 +2,6 @@ package dev.harness.core.pi
 
 import dev.harness.core.env.HarnessPaths
 import dev.harness.core.env.ProotCommand
-import dev.harness.core.rpc.ContentBlock
 import dev.harness.core.rpc.ExtensionUiRequest
 import dev.harness.core.rpc.PiEvent
 import dev.harness.core.rpc.PiEventRecord
@@ -18,8 +17,7 @@ import dev.harness.core.state.ChatReducer
 import dev.harness.core.state.ChatState
 import dev.harness.core.state.ModelInfo
 import dev.harness.core.state.NoticeLevel
-import dev.harness.core.state.toAssistantItem
-import dev.harness.core.state.toUserItem
+import dev.harness.core.state.SessionHydrator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -215,9 +213,64 @@ class AgentSession(
     }
 
     suspend fun newSession() {
-        rpc?.call(buildJsonObject { put("type", "new_session") })
-        publish(ChatState(sessionName = internal.sessionName))
-        rpc?.call(cmd("get_messages"))
+        val response = rpc?.call(buildJsonObject { put("type", "new_session") }, timeoutMs = 20_000)
+        if (response != null && !response.success) {
+            _notices.tryEmit(SessionNotice(response.error ?: "Não foi possível criar uma nova sessão.", NoticeLevel.Error))
+            return
+        }
+        // Fresh transcript, but keep model/thinking so the UI stays coherent.
+        publish(
+            ChatState(
+                model = internal.model,
+                thinkingLevel = internal.thinkingLevel,
+                availableThinkingLevels = internal.availableThinkingLevels,
+            ),
+        )
+        rpc?.call(cmd("get_state"), timeoutMs = 15_000)
+        rpc?.call(cmd("get_messages"), timeoutMs = 15_000)
+    }
+
+    /**
+     * Switches the running Pi to an existing session file (guest path) and
+     * restores its history into [ChatState]. Aborts safely first when the
+     * agent is streaming (acceptance §4.1.7). Returns false when the switch
+     * was rejected or cancelled — the caller then keeps the current session.
+     */
+    suspend fun switchToSession(guestSessionPath: String): Boolean {
+        val client = rpc ?: return false
+        if (internal.isBusy) abort()
+        val response = client.call(
+            buildJsonObject {
+                put("type", "switch_session")
+                put("sessionPath", guestSessionPath)
+            },
+            timeoutMs = 20_000,
+        ) ?: return false
+        if (!response.success) {
+            _notices.tryEmit(SessionNotice(response.error ?: "Não foi possível abrir a sessão.", NoticeLevel.Error))
+            return false
+        }
+        val cancelled = (response.data?.get("cancelled") as? kotlinx.serialization.json.JsonPrimitive)?.content == "true"
+        if (cancelled) return false
+        client.call(cmd("get_messages"), timeoutMs = 20_000)
+        client.call(cmd("get_state"), timeoutMs = 15_000)
+        return true
+    }
+
+    /**
+     * Duplicates the active branch into a new session (RPC `clone`). The Pi
+     * stays on the new copy; the caller reloads session lists afterwards.
+     */
+    suspend fun cloneActiveSession(): Boolean {
+        val client = rpc ?: return false
+        if (internal.isBusy) abort()
+        val response = client.call(cmd("clone"), timeoutMs = 20_000) ?: return false
+        if (!response.success) {
+            _notices.tryEmit(SessionNotice(response.error ?: "Não foi possível duplicar a sessão.", NoticeLevel.Error))
+            return false
+        }
+        client.call(cmd("get_state"), timeoutMs = 15_000)
+        return true
     }
 
     suspend fun setModel(provider: String, modelId: String) {
@@ -230,6 +283,19 @@ class AgentSession(
 
     suspend fun setThinkingLevel(level: String) {
         rpc?.call(buildJsonObject { put("type", "set_thinking_level"); put("level", level) })
+    }
+
+    /**
+     * Delivery modes for queued messages (rpc-commands.md):
+     * steering = "all"|"one-at-a-time", followUp = same. Applied after the
+     * handshake from the user's Chat preferences.
+     */
+    suspend fun setSteeringMode(mode: String) {
+        rpc?.call(buildJsonObject { put("type", "set_steering_mode"); put("mode", mode) })
+    }
+
+    suspend fun setFollowUpMode(mode: String) {
+        rpc?.call(buildJsonObject { put("type", "set_follow_up_mode"); put("mode", mode) })
     }
 
     suspend fun setSessionName(name: String) {
@@ -330,6 +396,10 @@ class AgentSession(
             model = parseModel(data["model"] as? JsonObject),
             thinkingLevel = data.stringOrNull("thinkingLevel") ?: internal.thinkingLevel,
             sessionName = data.stringOrNull("sessionName") ?: internal.sessionName,
+            sessionFile = data.stringOrNull("sessionFile") ?: internal.sessionFile,
+            sessionId = data.stringOrNull("sessionId") ?: internal.sessionId,
+            messageCount = (data["messageCount"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull()
+                ?: internal.messageCount,
         )
         dirty.set(true)
     }
@@ -353,27 +423,8 @@ class AgentSession(
 
     private fun hydrateMessages(response: PiResponseRecord?) {
         val messages = response?.data?.get("messages") as? JsonArray ?: return
-        val items = ArrayList<ChatItem>()
-        var toolCounter = 0
-        messages.forEachIndexed { index, el ->
-            val msg = PiMessage.from(el) ?: return@forEachIndexed
-            when (msg.role) {
-                "user" -> {
-                    val item = msg.toUserItem("h-user-$index")
-                    if (item.text.isNotBlank()) items += item
-                }
-                "assistant" -> {
-                    val hasVisible = msg.blocks.any {
-                        (it is ContentBlock.Text && it.text.isNotBlank()) ||
-                            (it is ContentBlock.Thinking && it.thinking.isNotBlank())
-                    }
-                    if (hasVisible) items += msg.toAssistantItem("h-asst-$index")
-                }
-                "toolResult" -> Unit // grouped by tool_execution events; skip on hydrate
-                else -> Unit
-            }
-        }
-        internal = internal.copy(items = items)
+        val parsed = messages.mapNotNull { el -> PiMessage.from(el) }
+        internal = internal.copy(items = SessionHydrator.toChatItems(parsed))
         dirty.set(true)
     }
 

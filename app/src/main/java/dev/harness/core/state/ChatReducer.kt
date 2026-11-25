@@ -264,25 +264,8 @@ private fun summarizeArgs(toolName: String, args: JsonObject?): String {
     }
 }
 
-private fun buildDiff(toolName: String, args: JsonObject?): DiffSummary? {
-    if (args == null || toolName.lowercase() != "edit") return null
-    val path = (args["path"] as? JsonPrimitive)?.content
-        ?: (args["filePath"] as? JsonPrimitive)?.content
-        ?: return null
-    val old = (args["oldString"] as? JsonPrimitive)?.content
-    val new = (args["newString"] as? JsonPrimitive)?.content
-    if (old == null && new == null) {
-        return DiffSummary(path = path, added = 0, removed = 0, previewLines = emptyList())
-    }
-    val oldLines = old?.lines() ?: emptyList()
-    val newLines = new?.lines() ?: emptyList()
-    val preview = mutableListOf<DiffLine>()
-    preview += DiffLine(DiffLine.Kind.Header, "− antigo")
-    oldLines.take(12).forEach { preview += DiffLine(DiffLine.Kind.Removed, it) }
-    preview += DiffLine(DiffLine.Kind.Header, "+ novo")
-    newLines.take(12).forEach { preview += DiffLine(DiffLine.Kind.Added, it) }
-    return DiffSummary(path = path, added = newLines.size, removed = oldLines.size, previewLines = preview)
-}
+private fun buildDiff(toolName: String, args: JsonObject?): DiffSummary? =
+    buildDiffSummary(toolName, args)
 
 /** Tool results are `{content: [{type:"text", text:"..."}], details: {...}}`. */
 private fun extractText(result: JsonObject?): String? {

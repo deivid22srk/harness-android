@@ -129,3 +129,144 @@ rodada de polimento guiada pelo Crítico.
 | Ok | `toolOk` | "concluído" |
 | Erro | `toolError` | "erro" |
 | Cancelado | `textTertiary` | "cancelado" |
+
+## 8. Sessões por projeto (frente A)
+
+O Pi 1.6.0 grava cada conversa em `~/.pi/agent/sessions/--<cwd>--/<timestamp>_<id>.jsonl`
+(docs `session-format.md`; convenção verificada empiricamente — pontos e hífens
+preservados, apenas `/`, `\`, `:` viram `-`). Como o app sempre abre o Pi no
+`cwd` do projeto (`/root/projects/<nome>`), o diretório de sessões de cada
+projeto é **determinístico e permanente** — é essa propriedade que sustenta o
+recurso, não uma cópia local do histórico.
+
+Padrões novos:
+
+- **`SessionRepository` (`core/sessions/`)** — lista/resume/renomeia/exclui
+  sessões lendo os JSONL **sem subir o Pi**. Sumário via gate regex +
+  dispatch pelo tipo *parseado* (`session`/`message`/`session_info`/
+  `model_change`); arquivo truncado/corrompido degrada (`corrupt`/`truncated`)
+  sem quebrar. Fonte da verdade segue sendo o arquivo do Pi; o app só guarda
+  o marcador "última sessão ativa por projeto" (`files/state/last-session.properties`).
+- **Retomada** — abrir um projeto inicia o Pi e envia `switch_session` →
+  `get_messages` → `ChatState` reconstruído por `SessionHydrator` (inclui
+  cards de tool call com resultado/erro/cancelado, diffs de `edit`, execuções
+  `bash` como avisos). Configurável ("Retomar última sessão", padrão: ligado);
+  desligado, abrir o projeto mostra a lista de sessões sem subir o Pi.
+- **Tela "Sessões do projeto"** — busca, itens com título (nome, senão
+  primeira mensagem), data relativa, contagem, modelo, selo "Ativa"; menu por
+  item (renomear/duplicar/excluir) com confirmação + snackbar de desfazer (6 s);
+  botão "Nova sessão" em destaque; estados esqueleto/vazio/erro com retry.
+  Ação destructiva na sessão **ativa** é bloqueada com mensagem clara
+  (trocar antes de excluir) — nunca corromper estado (aceite §4.1.7).
+- **Troca segura** — trocar/duplicar com o agente ocupando CPU faz `abort`
+  antes do `switch_session`; a sessão abortada permanece no disco.
+- **Top bar do chat** — nome da sessão tocável (renomear via RPC
+  `set_session_name`) + ícone de acesso rápido à lista.
+- **Prova objetiva em CI** — `scripts/session-persistence.js` (chamado pelo
+  job `smoke`): fixture em formato real → `switch_session` → `get_messages` →
+  `kill -9` → processo novo → mesma sessão → histórico idêntico (`SESSIONS_OK`).
+
+## 9. Navegação (atualização)
+
+`Screen` ganhou `Sessions`. Fluxos: Projects → Chat (retoma) ou Projects →
+Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
+(`backFromSessions` volta ao Chat quando há sessão viva, senão aos Projetos).
+
+## 10. Configurações por categorias (frente B)
+
+- **Hub + busca**: `SettingsScreen` vira um hub com `SettingsCategoryRow`
+  (ícone, título, subtítulo com o valor atual — "Tema: Escuro", "Chave: ✓").
+  A busca filtra as categorias pelo título e leva direto à tela certa.
+- **Categorias**: cada uma abre sua tela (`SettingsSection` enum em
+  `HarnessUiState.settingsSection`, predictive back fecha categoria → hub →
+  sai). Deep link `harness://settings/{categoria}` (ex.: `harness://settings/appearance`).
+- **Lista-detalhe** em telas largas (`WindowWidthSizeClass ≥ Medium`): hub à
+  esquerda (360 dp), categoria à direita — tablet e dobrável.
+- **Componentes** (`ui/components/settings/SettingsRows.kt`, com previews
+  escuro/claro/fonte grande): `SettingsCategoryRow`, `SettingsSwitchRow`,
+  `SettingsChoiceRow` (+ `HBottomSheetChoice` com radio),
+  `SettingsSliderRow` (discreto, para a fonte), `SettingsInfoRow`,
+  `SettingsDangerRow` (ações destrutivas separadas com confirmação).
+- **Persistência tipada**: `SettingsRepository` migrado para **DataStore**
+  (`AppSettings` imutável com defaults; snapshot em memória para leituras
+  síncronas sem refazer os ViewModels; migração one-shot do SharedPreferences
+  legado, que é limpo ao final; chaves de API permanecem no `SecretStore`
+  intocadas).
+- **Preferências de chat reais**: rolagem automática (`ChatList`), markdown
+  on/off, enviar com Enter (IME action do `Composer`) e haptics ao enviar —
+  todas ligadas ao comportamento, nada de opção morta.
+- **Robustez**: `Apagar dados` (Privacidade) e `Reinstalar ambiente`
+  (Ambiente) com confirmação; diagnósticos com cópia e teste real do ambiente
+  (node/pi versões via PRoot).
+
+## 11. Pacotes do Pi (frente C)
+
+- **Fonte da verdade**: `~/.pi/agent/settings.json` (global) e
+  `.pi/settings.json` (projeto, `-l`) — lidos direto do host (o rootfs é
+  acessível), nunca parse da saída frágil de `pi list`. O CLI roda **dentro do
+  PRoot** com `HOME=/root` e o `cwd` do projeto, então os arquivos são os
+  mesmos que o Pi usa.
+- **`PiPackageManager` (`core/pi/`)**: `listInstalled` (JSON declarado +
+  recursos do `package.json`/pastas convencionais), `install/remove` com
+  `Flow<String>` de saída ao vivo, `update(--extensions | <source>)` — **nunca
+  `pi update` pelado** (isso atualiza o próprio Pi). Um processo por vez
+  (mutex) com cancelamento real (`destroyForcibly`).
+- **Explorador**: busca no npm (`registry.npmjs.org/-/v1/search`,
+  `keywords:pi-package`, paginada) conforme o arquivo do usuário; cartões com
+  nome/versão/descrição/autor/downloads/data/tipo por keyword; toque preenche
+  a origem. Nota explícita de que os resultados vêm do npm e podem diferir da
+  galeria pi.dev.
+- **Segurança**: diálogo de confirmação OBRIGATÓRIO antes de instalar
+  ("executa código com as permissões do Pi"); bloqueio quando o agente está
+  gerando resposta; uma operação por vez.
+- **Tela** (`PackagesScreen`, dentro de Configurações → Pacotes do Pi):
+  seções Global/Do projeto, itens com ícone de origem (npm/git/local), versão
+  ou ref, selo "Fixado" e recursos; instalar com validação de formato +
+  exemplos tocáveis + escolha de escopo; log recolhível com "Cancelar" e
+  "Copiar diagnóstico"; erros com retry; pós-operação o banner oferece
+  **"Reiniciar sessão agora"** (`restartSessionAfterPackageChange` reinicia o
+  Pi e retoma a MESMA sessão — Frente A).
+- **Prova em CI**: smoke instala `npm:cc-safety-net@2.8.3` (fixado,
+  determinístico), valida o `settings.json` + `pi list`, remove e valida de
+  novo (`PACKAGES_OK`).
+
+## 12. Rodada 4 — integração e polimento
+
+- **Modo de steering/follow-up** (§6.1): duas escolhas em Configurações →
+  Chat ("Uma por vez" / "Todas juntas") mapeadas para `set_steering_mode`/
+  `set_follow_up_mode`; aplicadas a cada handshake (`applyQueueModes`) e ao
+  vivo quando o agente está conectado.
+- **Atualizar o Pi** (Ambiente): `pi update` real, com confirmação, bloqueio
+  com agente ocupado e log exibido na própria categoria. NUNCA usado para
+  pacotes (aqueles usam `--extensions`/fonte específica).
+- **Limpar sessões antigas** (Projetos e sessões): mantém as 10 mais recentes,
+  nunca apaga a sessão ativa (Frente A), com confirmação e notice de resultado.
+- **Hub com valor real**: "Pacotes do Pi" mostra "N pacote(s) instalado(s)";
+  a busca do hub indexa palavras-chave por categoria (ex.: "enter" acha Chat).
+- **Explorador paginado**: "Carregar mais" acumula páginas (`from`), retry
+  dedicado no erro da busca.
+- **Swipe para excluir** na lista de sessões (M3 `SwipeToDismissBox`, com
+  desfazer); renomear/duplicar permanecem no menu ⋮ (melhor para TalkBack).
+- **Migração versionada**: `migrated_version` no DataStore (v1) — futuras
+  migrações podem ser encadeadas sem re-importar.
+- **Limitação documentada**: deep links (`harness://settings/{categoria}`)
+  funcionam em cold start e `onNewIntent` (setIntent + LaunchedEffect);
+  entregas fora desses caminhos dependem de recomposição — aceitável na
+  arquitetura sem biblioteca de navegação.
+
+## 13. Rodada 5 — refinamentos finais
+
+- `PackageDeclaredCodec` (`core/pi/`): codec puro do estado declarado (strings
+  e objetos {source}) + recursos por `package.json`/pastas — testável sem
+  Android; `PiPackageManager` delega nele.
+- `PackagesScreen` decomposta em `InstalledPackagesSection` /
+  `ExplorerSection` / `OperationLogCard` (composables internos reutilizáveis).
+- Resumo pós-operação: "Estado declarado: N pacote(s)" entra no log ao final
+  de cada operação e após cancelamento (estado revalidado explícito).
+- Previews (escuro/claro/fonte grande) para `PackageRow` e `SessionRow`.
+- A11y: fundo do swipe com description dedicada ("Excluir <título>").
+
+## 14. Rodada 6 — a11y fino
+
+- Contagens de resultados com `LiveRegionMode.Polite` na busca de sessões e no
+  explorador de pacotes — TalkBack anuncia mudanças sem roubar o foco.
