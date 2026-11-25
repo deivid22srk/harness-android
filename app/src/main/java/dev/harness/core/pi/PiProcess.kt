@@ -28,26 +28,25 @@ data class PiLaunchConfig(
 class PiProcess(
     private val paths: HarnessPaths,
     private val proot: ProotCommand,
-) {
+) : PiProcessHandle {
     private var running: ProcessRunner.Running? = null
 
     /** The underlying OS process, or null when stopped. */
-    val process: Process? get() = running?.process
+    override val process: Process? get() = running?.process
 
-    val isAlive: Boolean get() = process?.isAlive == true
+    override val isAlive: Boolean get() = process?.isAlive == true
 
     @Synchronized
-    fun start(config: PiLaunchConfig): ProcessRunner.Running {
+    override fun start(config: PiLaunchConfig) {
         stop()
         val argv = buildArgv(config)
         val env = proot.hostEnv(config.apiKeys)
         val proc = ProcessRunner.start(argv, env, workDir = paths.filesDir, mergeStderr = false)
         running = proc
-        return proc
     }
 
     @Synchronized
-    fun stop() {
+    override fun stop() {
         running?.let { run ->
             runCatching { run.process.outputStream.close() } // stdin EOF => orderly shutdown
             runCatching { run.process.destroy() }

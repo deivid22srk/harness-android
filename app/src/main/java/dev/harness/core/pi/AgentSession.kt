@@ -38,10 +38,31 @@ import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-enum class ConnectionState { Stopped, Starting, Connected, Restarting, Failed }
+enum class ConnectionState { Stopped, Starting, Connected, NoProvider, Restarting, Failed }
+
+/**
+ * Immutable snapshot for the connection diagnostics sheet (chat indicator).
+ * Pi conectado ≠ provedor configurado: [ConnectionState.NoProvider] means the
+ * RPC is healthy but no credential was injected at launch (AUDIT_V3 C2).
+ */
+data class ConnectionInfo(
+    val lastError: String? = null,
+    val startedAtMs: Long? = null,
+)
 
 /** One-shot user-facing notifications originating from the session. */
 data class SessionNotice(val text: String, val level: NoticeLevel)
+
+/**
+ * Abstraction over the Pi process owner so unit tests can run the whole
+ * supervisor (handshake, death detection, restart) against a fake process.
+ */
+interface PiProcessHandle {
+    val process: Process?
+    val isAlive: Boolean
+    fun start(config: PiLaunchConfig)
+    fun stop()
+}
 
 /**
  * Orchestrates the whole agent: starts the Pi process inside PRoot, speaks RPC,
@@ -54,6 +75,13 @@ class AgentSession(
     private val paths: HarnessPaths,
     private val proot: ProotCommand,
     private val scope: CoroutineScope,
+    private val processFactory: (PiLaunchConfig) -> PiProcessHandle = { config ->
+        PiProcess(paths, proot).also { it.start(config) }
+    },
+    /** Handshake timeout (PROMPT §4.3.4); parameterized for fast unit tests. */
+    val handshakeTimeoutMs: Long = 15_000,
+    /** Base backoff for crash restarts; parameterized for fast unit tests. */
+    val restartBaseMs: Long = 2_000,
 ) {
     private val reducer = ChatReducer()
     private val stateFlow = MutableStateFlow(ChatState())
@@ -62,6 +90,13 @@ class AgentSession(
     private val connectionFlow = MutableStateFlow(ConnectionState.Stopped)
     val connection: StateFlow<ConnectionState> = connectionFlow.asStateFlow()
 
+    private val connectionInfoFlow = MutableStateFlow(ConnectionInfo())
+    val connectionInfo: StateFlow<ConnectionInfo> = connectionInfoFlow.asStateFlow()
+
+    /** Session file (guest path) that was active before a controlled restart. */
+    @Volatile
+    private var lastKnownSessionFile: String? = null
+
     private val uiRequestQueue = Channel<ExtensionUiRequest>(Channel.UNLIMITED)
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 32)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
@@ -69,7 +104,7 @@ class AgentSession(
     private val _pendingUi = MutableStateFlow<List<ExtensionUiRequest>>(emptyList())
     val pendingUi: StateFlow<List<ExtensionUiRequest>> = _pendingUi.asStateFlow()
 
-    private var pi: PiProcess? = null
+    private var pi: PiProcessHandle? = null
     private var rpc: RpcClient? = null
     private var internal = ChatState()
     private val dirty = AtomicBoolean(false)
@@ -88,16 +123,19 @@ class AgentSession(
     suspend fun start(launch: PiLaunchConfig): Boolean {
         config = launch
         connectionFlow.value = ConnectionState.Starting
+        connectionInfoFlow.value = connectionInfoFlow.value.copy(lastError = null, startedAtMs = System.currentTimeMillis())
         stopInternal()
         if (!paths.hasProotBinaries) {
             connectionFlow.value = ConnectionState.Failed
+            connectionInfoFlow.value = connectionInfoFlow.value.copy(lastError = "Binários do ambiente ausentes no APK.")
             publish(internal.copy(error = "Binários do ambiente ausentes no APK."))
             return false
         }
         val process = try {
-            PiProcess(paths, proot).also { it.start(launch) }
+            processFactory(launch)
         } catch (t: Throwable) {
             connectionFlow.value = ConnectionState.Failed
+            connectionInfoFlow.value = connectionInfoFlow.value.copy(lastError = t.message)
             publish(internal.copy(error = "Não foi possível iniciar o agente: ${t.message}"))
             return false
         }
@@ -122,26 +160,49 @@ class AgentSession(
         client.start()
         startPublisher()
 
-        // Handshake: state, models, and existing messages. All four commands
-        // must succeed before we report Connected — otherwise the UI would
-        // show a healthy session with empty state.
-        val stateResp = client.call(cmd("get_state"), timeoutMs = 15_000)
+        // Handshake: state, models, and existing messages. get_state must
+        // succeed before we report any connected state; the provider check
+        // then decides Connected vs NoProvider (Pi conectado ≠ provedor
+        // configurado — PROMPT §4.2).
+        val stateResp = client.call(cmd("get_state"), timeoutMs = handshakeTimeoutMs)
             ?: run {
+                val msg = "O agente não respondeu ao handshake (get_state, ${handshakeTimeoutMs / 1000} s)."
                 connectionFlow.value = ConnectionState.Failed
-                publish(internal.copy(error = "O agente não respondeu ao handshake (get_state)."))
+                connectionInfoFlow.value = connectionInfoFlow.value.copy(lastError = msg)
+                publish(internal.copy(error = msg))
                 stopInternal()
                 return false
             }
         hydrateState(stateResp)
-        client.call(cmd("get_available_models"))
+        // Await the model list: it feeds both the composer picker and the
+        // provider check, and the smoke test logs it as the objective proof
+        // that RPC works without any key.
+        client.call(cmd("get_available_models"), timeoutMs = handshakeTimeoutMs)
         client.call(cmd("get_messages"))
         client.call(cmd("get_available_thinking_levels"))
 
         watchProcess(process)
         restartAttempts.set(0)
         publish(internal.copy(error = null))
-        connectionFlow.value = ConnectionState.Connected
+        connectionFlow.value = if (launch.apiKeys.isEmpty()) ConnectionState.NoProvider else ConnectionState.Connected
         return true
+    }
+
+    /**
+     * Controlled restart applying new credentials/model WITHOUT losing the
+     * active session (PROMPT §4.3.3). Used when the user saves an API key or
+     * switches provider/model while the agent is already running.
+     */
+    suspend fun applyCredentials(newConfig: PiLaunchConfig): Boolean {
+        val resumeGuest = internal.sessionFile ?: lastKnownSessionFile
+        config = newConfig
+        connectionFlow.value = ConnectionState.Restarting
+        stopInternal()
+        val started = start(newConfig)
+        if (started && resumeGuest != null) {
+            switchToSession(resumeGuest)
+        }
+        return started
     }
 
     fun stop() {
@@ -184,7 +245,10 @@ class AgentSession(
                 SessionNotice("A mensagem não foi confirmada pelo agente (timeout). Verifique a conexão.", NoticeLevel.Error),
             )
             !response.success -> _notices.tryEmit(
-                SessionNotice(response.error ?: "Falha ao enviar a mensagem.", NoticeLevel.Error),
+                SessionNotice(
+                    translatedProviderError(response.error ?: "Falha ao enviar a mensagem."),
+                    NoticeLevel.Error,
+                ),
             )
         }
     }
@@ -386,17 +450,25 @@ class AgentSession(
             else -> Unit
         }
         if (!response.success && response.error != null && response.command == "prompt") {
-            _notices.tryEmit(SessionNotice(response.error, NoticeLevel.Error))
+            _notices.tryEmit(SessionNotice(translatedProviderError(response.error), NoticeLevel.Error))
         }
+    }
+
+    /** Human pt-BR message when the error matches a known provider pattern. */
+    private fun translatedProviderError(raw: String?): String {
+        val translated = dev.harness.core.rpc.ProviderErrors.translate(raw)
+        return translated?.message ?: (raw ?: "Falha desconhecida do provedor.")
     }
 
     private fun hydrateState(response: PiResponseRecord?) {
         val data = response?.data ?: return
+        val sessionFile = data.stringOrNull("sessionFile") ?: internal.sessionFile
+        if (sessionFile != null) lastKnownSessionFile = sessionFile
         internal = internal.copy(
             model = parseModel(data["model"] as? JsonObject),
             thinkingLevel = data.stringOrNull("thinkingLevel") ?: internal.thinkingLevel,
             sessionName = data.stringOrNull("sessionName") ?: internal.sessionName,
-            sessionFile = data.stringOrNull("sessionFile") ?: internal.sessionFile,
+            sessionFile = sessionFile,
             sessionId = data.stringOrNull("sessionId") ?: internal.sessionId,
             messageCount = (data["messageCount"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull()
                 ?: internal.messageCount,
@@ -463,7 +535,7 @@ class AgentSession(
         stateFlow.value = newState
     }
 
-    private fun drainStderr(process: PiProcess) {
+    private fun drainStderr(process: PiProcessHandle) {
         val osProcess = process.process ?: return
         stderrJob?.cancel()
         stderrJob = scope.launch(Dispatchers.IO) {
@@ -478,7 +550,7 @@ class AgentSession(
         }
     }
 
-    private fun watchProcess(process: PiProcess) {
+    private fun watchProcess(process: PiProcessHandle) {
         val osProcess = process.process ?: return
         scope.launch(Dispatchers.IO) {
             val exit = runCatching { osProcess.waitFor() }.getOrDefault(-1)
@@ -500,7 +572,7 @@ class AgentSession(
                 publish(internal.copy(error = "O agente não pôde ser mantido em execução."))
                 return@launch
             }
-            val backoff = RESTART_BASE_MS shl (attempt - 1)
+            val backoff = restartBaseMs shl (attempt - 1)
             connectionFlow.value = ConnectionState.Restarting
             _notices.tryEmit(
                 SessionNotice(
@@ -527,9 +599,8 @@ class AgentSession(
 
     private companion object {
         const val FRAME_MS = 33L
-        const val STDERR_TAIL_LINES = 200
+        const val STDERR_TAIL_LINES = 2000
         const val MAX_RESTARTS = 3
-        const val RESTART_BASE_MS = 2_000L
     }
 }
 

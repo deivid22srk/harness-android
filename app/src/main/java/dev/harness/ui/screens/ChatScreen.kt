@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Refresh
@@ -73,6 +74,7 @@ import dev.harness.HarnessUiState
 import dev.harness.R
 import dev.harness.SessionsUiState
 import dev.harness.SessionsViewModel
+import dev.harness.SettingsSection
 import dev.harness.core.pi.ConnectionState
 import dev.harness.core.state.AgentStatus
 import dev.harness.core.state.ChatItem
@@ -88,6 +90,7 @@ import dev.harness.ui.components.HDialog
 import dev.harness.ui.components.HEmptyState
 import dev.harness.ui.components.HIconButton
 import dev.harness.ui.components.HMarkdown
+import dev.harness.ui.components.ConnectionSheet
 import dev.harness.ui.components.HTextField
 import dev.harness.ui.components.ToolCallCard
 import dev.harness.ui.components.touchTargetClickable
@@ -109,6 +112,8 @@ fun ChatScreen(
     sessionsViewModel: SessionsViewModel? = null,
 ) {
     val colors = HarnessTheme
+    var connectionSheetOpen by remember { mutableStateOf(false) }
+    var providerTestResult by remember { mutableStateOf<String?>(null) }
     Column(
         Modifier
             .fillMaxSize()
@@ -120,6 +125,7 @@ fun ChatScreen(
             subtitle = uiState.chat.sessionName,
             connection = uiState.connection,
             modelName = uiState.chat.model?.name,
+            onConnectionTap = { connectionSheetOpen = true },
             onNewSession = viewModel::newSession,
             onSettings = viewModel::openSettings,
             onBack = viewModel::backToProjects,
@@ -138,6 +144,13 @@ fun ChatScreen(
                 message = sessionError ?: stringResource(R.string.chat_session_error_title),
                 onRetry = viewModel::restartSession,
             )
+        }
+
+        // "Sem provedor": Pi healthy but no credential — invitation banner,
+        // never a blocker (PROMPT §4.3.2, onboarding sem fricção §7). The chat
+        // stays fully usable; sending a prompt shows this same state.
+        if (uiState.connection == ConnectionState.NoProvider) {
+            NoProviderBanner(onConfigure = { viewModel.openSettingsSection(SettingsSection.Account) })
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -215,6 +228,25 @@ fun ChatScreen(
             onDismiss = { viewModel.setPicker(HarnessViewModel.Pickers.Attach, false) },
         )
     }
+
+    if (connectionSheetOpen) {
+        HBottomSheet(
+            title = stringResource(R.string.conn_sheet_title),
+            onDismiss = { connectionSheetOpen = false },
+        ) {
+            ConnectionSheet(
+                state = uiState.connection,
+                piVersion = (uiState.provision as? dev.harness.core.env.ProvisionState.Ready)?.piVersion,
+                uptime = viewModel.uptimeText(),
+                lastError = uiState.connectionInfo.lastError,
+                stderrTail = viewModel.agentStderrTail(),
+                providerTest = providerTestResult,
+                onTestProvider = { providerTestResult = viewModel.testProviderConnection() },
+                onRestart = viewModel::restartSession,
+                onDismiss = { connectionSheetOpen = false },
+            )
+        }
+    }
 }
 
 @Composable
@@ -223,6 +255,7 @@ private fun ChatTopBar(
     subtitle: String?,
     connection: ConnectionState,
     modelName: String?,
+    onConnectionTap: () -> Unit,
     onNewSession: () -> Unit,
     onSettings: () -> Unit,
     onBack: () -> Unit,
@@ -270,7 +303,12 @@ private fun ChatTopBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Space.sm),
                 ) {
-                    HBadge(text = connectionLabel(connection), color = connectionColor(connection))
+                    // Tappable connection indicator → diagnostics sheet (§4.3.9).
+                    HBadge(
+                        text = connectionLabel(connection),
+                        color = connectionColor(connection),
+                        modifier = Modifier.touchTargetClickable(onClick = onConnectionTap),
+                    )
                     Text(
                         subtitle ?: stringResource(R.string.sessions_untitled),
                         style = MaterialTheme.typography.bodySmall,
@@ -337,6 +375,7 @@ private fun connectionLabel(state: ConnectionState): String = stringResource(
     when (state) {
         ConnectionState.Connected -> R.string.conn_connected
         ConnectionState.Starting -> R.string.conn_starting
+        ConnectionState.NoProvider -> R.string.conn_no_provider
         ConnectionState.Restarting -> R.string.conn_restarting
         ConnectionState.Stopped -> R.string.conn_stopped
         ConnectionState.Failed -> R.string.conn_failed
@@ -347,8 +386,53 @@ private fun connectionLabel(state: ConnectionState): String = stringResource(
 private fun connectionColor(state: ConnectionState) = when (state) {
     ConnectionState.Connected -> HarnessTheme.toolOk
     ConnectionState.Starting, ConnectionState.Restarting -> HarnessTheme.toolRunning
+    ConnectionState.NoProvider -> HarnessTheme.warning
     ConnectionState.Stopped -> HarnessTheme.textTertiary
     ConnectionState.Failed -> HarnessTheme.toolError
+}
+
+/**
+ * "Sem provedor" invitation banner (§4.3.2): the Pi is connected but no
+ * provider credential exists. Non-blocking — the rest of the app keeps
+ * working; the CTA opens the provider configuration directly.
+ */
+@Composable
+internal fun NoProviderBanner(onConfigure: () -> Unit) {
+    val colors = HarnessTheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.lg, vertical = Space.xs)
+            .clip(Radii.shapeMd)
+            .background(colors.accentContainer)
+            .padding(horizontal = Space.md, vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        Icon(
+            Icons.Default.Info,
+            contentDescription = null,
+            tint = colors.accentText,
+            modifier = Modifier.size(18.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.no_provider_title),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onAccentContainer,
+            )
+            Text(
+                stringResource(R.string.no_provider_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onAccentContainer,
+            )
+        }
+        HButton(
+            stringResource(R.string.no_provider_cta),
+            onConfigure,
+            variant = HButtonDefaults.Variant.Ghost,
+        )
+    }
 }
 
 @Composable

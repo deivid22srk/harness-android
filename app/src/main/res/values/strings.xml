@@ -24,9 +24,32 @@
     <!-- Connection -->
     <string name="conn_connected">conectado</string>
     <string name="conn_starting">iniciando</string>
+    <string name="conn_no_provider">sem provedor</string>
     <string name="conn_restarting">reiniciando</string>
     <string name="conn_stopped">parado</string>
     <string name="conn_failed">falha</string>
+
+    <!-- Sem provedor (banner) -->
+    <string name="no_provider_title">Sem provedor configurado</string>
+    <string name="no_provider_body">O agente está conectado. Para conversar com o modelo, adicione a chave de um provedor — nada mais é bloqueado.</string>
+    <string name="no_provider_cta">Configurar provedor</string>
+
+    <!-- Sheet de conexão -->
+    <string name="conn_sheet_title">Conexão</string>
+    <string name="conn_sheet_state">Estado</string>
+    <string name="conn_sheet_version">Versão do Pi</string>
+    <string name="conn_sheet_uptime">Tempo ativo</string>
+    <string name="conn_sheet_stderr_title">Saída de diagnóstico (stderr)</string>
+    <string name="conn_sheet_test">Testar provedor</string>
+    <string name="conn_sheet_restart">Reiniciar Pi</string>
+
+    <!-- Teste de provedor (sem gastar tokens) -->
+    <string name="diag_test_pi_ok">O agente está em execução e respondeu ao RPC.</string>
+    <string name="diag_test_pi_down">O agente NÃO está em execução (estado: %1$s). Use \"Reiniciar Pi\".</string>
+    <string name="diag_test_key_ok">Chave presente para \"%1$s\" — será aplicada na próxima inicialização (a atual reinicia automaticamente).</string>
+    <string name="diag_test_key_missing">Nenhuma chave configurada para \"%1$s\". Configure em Provedores para conversar com o modelo.</string>
+    <string name="diag_test_model_ok">Modelo selecionado: %1$s.</string>
+    <string name="diag_test_model_missing">Nenhum modelo selecionado ainda.</string>
 
     <!-- Chat -->
     <string name="chat_input_hint">Mensagem</string>
@@ -313,6 +336,7 @@
     <string name="settings_queue_one">Uma por vez</string>
     <string name="settings_diag_test">Teste do ambiente</string>
     <string name="settings_diag_test_run">Testar ambiente</string>
+    <string name="settings_diag_test_provider">Testar conexão com o provedor</string>
     <string name="settings_about_version_label">Versão</string>
     <string name="settings_about_runtime">Execução</string>
     <string name="settings_about_runtime_value">Alpine → Node → Pi (RPC) sob PRoot</string>

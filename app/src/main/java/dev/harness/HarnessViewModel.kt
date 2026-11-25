@@ -69,6 +69,7 @@ data class HarnessUiState(
     val screen: Screen = Screen.Onboarding,
     val provision: ProvisionState = ProvisionState.Idle,
     val connection: ConnectionState = ConnectionState.Stopped,
+    val connectionInfo: dev.harness.core.pi.ConnectionInfo = dev.harness.core.pi.ConnectionInfo(),
     val chat: ChatState = ChatState(),
     val projects: List<Project> = emptyList(),
     val projectsQuery: String = "",
@@ -201,6 +202,11 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         viewModelScope.launch {
             container.session.connection.collect { conn ->
                 _ui.value = _ui.value.copy(connection = conn)
+            }
+        }
+        viewModelScope.launch {
+            container.session.connectionInfo.collect { info ->
+                _ui.value = _ui.value.copy(connectionInfo = info)
             }
         }
         viewModelScope.launch {
@@ -701,6 +707,9 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         container.settings.model = id
         _ui.value = _ui.value.copy(selectedProvider = provider, showModelPicker = false)
         viewModelScope.launch { container.session.setModel(provider, id) }
+        // If the agent is running without a provider, applying credentials now
+        // moves it out of "Sem provedor" without reopening the project.
+        applyCredentialsToRunningAgent()
     }
 
     fun pickThinking(level: String) {
@@ -905,10 +914,13 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         container.settings.provider = providerId
         _ui.value = _ui.value.copy(selectedProvider = providerId)
         refreshChatModels(_ui.value.chat)
+        // Provider switch while live: apply through the same controlled restart
+        // (same session file is kept).
+        applyCredentialsToRunningAgent()
     }
 
     fun saveApiKey(provider: String, key: String): Boolean {
-        return runCatching {
+        val saved = runCatching {
             container.settings.setApiKey(provider, key)
         }.onFailure {
             setNotice(
@@ -918,7 +930,97 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
                 ),
             )
         }.isSuccess
+        // A chave só é injetada no ambiente na inicialização do Pi: quando o
+        // agente já está em execução, reinício controlado PRESERVANDO a sessão
+        // ativa (PROMPT §4.3.3 / AUDIT_V3 C1). O app nunca precisa ser fechado.
+        if (saved) applyCredentialsToRunningAgent()
+        return saved
     }
+
+    /**
+     * Applies provider/model/key changes to a RUNNING agent with a controlled
+     * restart that resumes the same session file. No-op when the agent is not
+     * live (the next openProject start already picks the new values).
+     */
+    private fun applyCredentialsToRunningAgent() {
+        val conn = _ui.value.connection
+        if (conn != ConnectionState.Connected &&
+            conn != ConnectionState.NoProvider &&
+            conn != ConnectionState.Restarting
+        ) return
+        val project = _ui.value.activeProject ?: return
+        val config = container.launchConfig().copy(
+            workDirGuest = project.guestPath,
+            sessionName = project.name,
+        )
+        activeLaunch = config
+        viewModelScope.launch { container.session.applyCredentials(config) }
+    }
+
+    /**
+     * "Testar conexão com o provedor" (Diagnóstico). Não gasta tokens: valida
+     * os pré-requisitos locais da conversa com o modelo — chave presente para
+     * o provedor selecionado, modelo selecionado e RPC do Pi ativo — e
+     * resume o resultado em linguagem humana para o sheet de conexão.
+     */
+    fun testProviderConnection(): String {
+        val parts = ArrayList<String>()
+        val providerId = _ui.value.selectedProvider
+        val hasKey = runCatching { container.settings.apiKey(providerId)?.isNotBlank() == true }.getOrDefault(false)
+        val piOk = _ui.value.connection.let {
+            it == ConnectionState.Connected || it == ConnectionState.NoProvider
+        }
+        parts += if (piOk) {
+            appContext.getString(R.string.diag_test_pi_ok)
+        } else {
+            appContext.getString(R.string.diag_test_pi_down, _ui.value.connection.name)
+        }
+        parts += if (hasKey) {
+            appContext.getString(R.string.diag_test_key_ok, providerId)
+        } else {
+            appContext.getString(R.string.diag_test_key_missing, providerId)
+        }
+        parts += if (_ui.value.chat.model != null) {
+            appContext.getString(R.string.diag_test_model_ok, _ui.value.chat.model!!.name)
+        } else {
+            appContext.getString(R.string.diag_test_model_missing)
+        }
+        return parts.joinToString("\n")
+    }
+
+    /** Full diagnostics text for the connection sheet "Copiar diagnóstico". */
+    fun connectionDiagnostics(): String {
+        val provision = container.provisioner.state.value
+        val piVersion = (provision as? ProvisionState.Ready)?.piVersion
+        val nodeVersion = (provision as? ProvisionState.Ready)?.nodeVersion
+        return buildString {
+            appendLine("== conexão ==")
+            appendLine("estado: ${_ui.value.connection.name}")
+            appendLine("pi: $piVersion / node: $nodeVersion")
+            appendLine("sessão: ${_ui.value.chat.sessionFile ?: "—"}")
+            appendLine("iniciado há: ${uptimeText()}")
+            _ui.value.connectionInfo.lastError?.let { appendLine("último erro: $it") }
+            appendLine()
+            appendLine("== teste de provedor ==")
+            appendLine(testProviderConnection())
+            appendLine()
+            appendLine(buildDiagnostics())
+        }
+    }
+
+    /** Uptime of the running agent, human pt-BR ("4m", "1h 2m"). */
+    fun uptimeText(): String {
+        val startedAt = _ui.value.connectionInfo.startedAtMs ?: return "—"
+        val seconds = (System.currentTimeMillis() - startedAt) / 1000
+        return when {
+            seconds < 60 -> "${seconds}s"
+            seconds < 3600 -> "${seconds / 60}m ${(seconds % 60)}s"
+            else -> "${seconds / 3600}h ${(seconds % 3600) / 60}m"
+        }
+    }
+
+    /** Live stderr tail of the Pi process (bounded, safe from any thread). */
+    fun agentStderrTail(): String = runCatching { container.session.stderrLog() }.getOrDefault("")
 
     fun addCustomProvider(id: String, label: String, baseUrl: String, api: String, models: String) {
         val safeId = id.trim().lowercase().replace(Regex("[^a-z0-9._-]"), "-")
@@ -943,6 +1045,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             selectedProvider = safeId,
         )
         container.settings.provider = safeId
+        applyCredentialsToRunningAgent()
     }
 
     fun removeCustomProvider(id: String) {

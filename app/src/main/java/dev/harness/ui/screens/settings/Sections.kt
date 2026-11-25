@@ -617,6 +617,17 @@ fun DiagnosticsSection(
         envTest?.let {
             HCodeBlock(code = it, language = "log")
         }
+        // Testar conexão com o provedor (§4.3.10) — sem gastar tokens.
+        var providerTest by remember { mutableStateOf<String?>(null) }
+        HSectionTitle(stringResource(R.string.settings_diag_test_provider))
+        HButton(
+            stringResource(R.string.conn_sheet_test),
+            onClick = { providerTest = viewModel.testProviderConnection() },
+            variant = HButtonDefaults.Variant.Secondary,
+        )
+        providerTest?.let {
+            HCodeBlock(code = it, language = "log")
+        }
         Spacer(Modifier.height(Space.xl))
     }
 }
