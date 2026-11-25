@@ -32,9 +32,13 @@ class HarnessPaths(context: Context) {
     val stateDir = File(filesDir, "state")
 
     /** Directory where Android extracts the packaged .so files; they are executable.
-     *  Null-safe: Robolectric leaves applicationInfo.nativeLibraryDir null, and
-     *  File(null) would NPE while booting the real Application in tests. */
-    val nativeLibDir: File = File(context.applicationInfo.nativeLibraryDir ?: "")
+     *  Fallback: Robolectric leaves applicationInfo.nativeLibraryDir null — use a
+     *  writable app-owned dir so tests can place fake binaries instead of
+     *  File(null) NPE / unwritable root paths. */
+    val nativeLibDir: File = context.applicationInfo.nativeLibraryDir
+        ?.takeIf { it.isNotBlank() }
+        ?.let(::File)
+        ?: File(filesDir, "nativelib")
     val prootBinary = File(nativeLibDir, "libproot.so")
     val prootLoader = File(nativeLibDir, "libproot-loader.so")
 

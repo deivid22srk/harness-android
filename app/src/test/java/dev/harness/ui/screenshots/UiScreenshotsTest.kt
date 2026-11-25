@@ -41,8 +41,10 @@ import java.io.File
 @Config(qualifiers = "+w412dp-h892dp", sdk = [34])
 class UiScreenshotsTest {
 
-    private val enabled: Boolean = System.getenv("HARNESS_SCREENSHOTS") == "1"
-    private val outDir = System.getenv("HARNESS_SCREENSHOTS_DIR") ?: "build/screenshots"
+    // Robolectric sandboxes System.getenv — the Gradle test config forwards the
+    // toggle as system properties (see app/build.gradle.kts testOptions).
+    private val enabled: Boolean = System.getProperty("harness.screenshots") == "1"
+    private val outDir = System.getProperty("harness.screenshots.dir") ?: "build/screenshots"
 
     private fun capture(name: String, dark: Boolean, fontScale: Float, content: @Composable () -> Unit) {
         if (!enabled) return

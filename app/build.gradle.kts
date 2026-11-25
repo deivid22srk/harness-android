@@ -94,6 +94,10 @@ android {
         // Robolectric (AgentSessionTest + Roborazzi screenshots) needs resources.
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
+            // Robolectric sandboxes System.getenv, so screenshot toggles travel
+            // as system properties (visible inside the sandbox).
+            it.systemProperty("harness.screenshots", System.getenv("HARNESS_SCREENSHOTS") ?: "0")
+            it.systemProperty("harness.screenshots.dir", System.getenv("HARNESS_SCREENSHOTS_DIR") ?: "build/screenshots")
             // Full stack traces in the CI console so failures are diagnosable
             // without downloading test reports.
             it.testLogging {
