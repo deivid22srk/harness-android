@@ -384,7 +384,7 @@
     <string name="packages_feature_prompts">prompts</string>
     <string name="packages_feature_themes">themes</string>
     <string name="packages_security_title">Install package?</string>
-    <string name="packages_security_body">The package "%1$s" can run code with Pi's permissions and influence the agent's behavior. Review its source before installing.</string>
+    <string name="packages_security_body">The package "%1$s" can run code with Pi\'s permissions and influence the agent\'s behavior. Review its source before installing.</string>
     <string name="packages_security_note">Third-party packages run code in your environment. Pi only loads new extensions after restarting the session.</string>
     <string name="packages_security_confirm">I trust it and want to install</string>
     <string name="packages_remove_title">Remove package?</string>
