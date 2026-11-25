@@ -19,6 +19,7 @@ object ProviderErrors {
         // API key problems -------------------------------------------------
         if ("401" in low || "unauthorized" in low || "invalid api key" in low ||
             "invalid_api_key" in low || "incorrect api key" in low ||
+            "x-api-key" in low || "authentication_error" in low ||
             "authentication" in low && "fail" in low
         ) {
             return Translated(

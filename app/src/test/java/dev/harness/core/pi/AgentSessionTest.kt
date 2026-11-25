@@ -35,6 +35,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * preserving the session, bounded stderr tail. Robolectric provides Context.
  */
 @RunWith(RobolectricTestRunner::class)
+// SDK 34: matches the screenshots pin. Robolectric's default (targetSdk 36)
+// requires Java 21, but the CI test JVM is Java 17.
+@org.robolectric.annotation.Config(sdk = [34])
 class AgentSessionTest {
 
     private lateinit var paths: HarnessPaths

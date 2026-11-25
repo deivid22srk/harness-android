@@ -93,6 +93,16 @@ android {
     testOptions {
         // Robolectric (AgentSessionTest + Roborazzi screenshots) needs resources.
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Full stack traces in the CI console so failures are diagnosable
+            // without downloading test reports.
+            it.testLogging {
+                events("failed")
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                showCauses = true
+                showStackTraces = true
+            }
+        }
     }
 }
 
