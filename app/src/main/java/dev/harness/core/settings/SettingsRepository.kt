@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -138,20 +139,20 @@ class SettingsRepository(context: Context) {
     private fun buildFromLegacy(prefs: android.content.SharedPreferences): AppSettings {
         val selected = HashMap<String, List<String>>()
         for (p in Providers.ALL) {
-            val raw = prefs.getString(KEY_SELECTED_PREFIX + p.id, null) ?: continue
+            val raw = prefs.getString("selected_models_" + p.id, null) ?: continue
             selected[p.id] = raw.split('\n').filter { it.isNotBlank() }
         }
-        val customRaw = prefs.getString(KEY_CUSTOM_PROVIDERS, null)
+        val customRaw = prefs.getString("custom_providers", null)
         return AppSettings(
-            provider = prefs.getString(KEY_PROVIDER, null) ?: "anthropic",
-            model = prefs.getString(KEY_MODEL, null) ?: "",
-            thinking = prefs.getString(KEY_THINKING, null) ?: "medium",
-            themeMode = ThemeMode.fromId(prefs.getString(KEY_THEME, null).orEmpty()),
-            dynamicColor = prefs.getBoolean(KEY_DYNAMIC, false),
-            fontScale = prefs.getFloat(KEY_FONT_SCALE, 1f),
-            resumeLastSession = prefs.getBoolean(KEY_RESUME_SESSION, true),
-            onboardingDone = prefs.getBoolean(KEY_ONBOARDED, false),
-            batteryPromptShown = prefs.getBoolean(KEY_BATTERY_PROMPT, false),
+            provider = prefs.getString("provider", null) ?: "anthropic",
+            model = prefs.getString("model", null) ?: "",
+            thinking = prefs.getString("thinking", null) ?: "medium",
+            themeMode = ThemeMode.fromId(prefs.getString("theme", null).orEmpty()),
+            dynamicColor = prefs.getBoolean("dynamic_color", false),
+            fontScale = prefs.getFloat("font_scale", 1f),
+            resumeLastSession = prefs.getBoolean("resume_last_session", true),
+            onboardingDone = prefs.getBoolean("onboarded", false),
+            batteryPromptShown = prefs.getBoolean("battery_prompt_shown", false),
             customProviders = customRaw?.let(::decodeLegacyCustom).orEmpty(),
             selectedModels = selected,
         )
@@ -368,17 +369,5 @@ class SettingsRepository(context: Context) {
         val KEY_CUSTOM_PROVIDERS = stringPreferencesKey("custom_providers_json")
         val KEY_SELECTED_MODELS = stringSetPreferencesKey("selected_models")
 
-        // Legacy SharedPreferences keys (for migration only)
-        const val KEY_CUSTOM_PROVIDERS_LEGACY = "custom_providers"
-        const val KEY_SELECTED_PREFIX = "selected_models_"
-        const val KEY_PROVIDER_LEGACY = "provider"
-        const val KEY_MODEL_LEGACY = "model"
-        const val KEY_THINKING_LEGACY = "thinking"
-        const val KEY_THEME_LEGACY = "theme"
-        const val KEY_DYNAMIC_LEGACY = "dynamic_color"
-        const val KEY_FONT_SCALE_LEGACY = "font_scale"
-        const val KEY_ONBOARDED_LEGACY = "onboarded"
-        const val KEY_BATTERY_PROMPT_LEGACY = "battery_prompt_shown"
-        const val KEY_RESUME_SESSION_LEGACY = "resume_last_session"
-    }
+}
 }
