@@ -126,8 +126,8 @@ fun ToolCallCard(
                 }
             }
             tool.diff?.let {
-                Text("+${it.added}", style = MonoStyle, color = colors.toolOk)
-                Text("−${it.removed}", style = MonoStyle, color = colors.toolError)
+                Text("+${it.added}", style = MonoStyle, color = colors.toolOkText)
+                Text("−${it.removed}", style = MonoStyle, color = colors.toolErrorText)
             }
             tool.durationMs?.let {
                 Text(formatDuration(it), style = MonoStyle, color = colors.textTertiary)
@@ -251,8 +251,8 @@ fun DiffView(diff: DiffSummary, modifier: Modifier = Modifier) {
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 diff.previewLines.forEach { line ->
                     val (prefix, tint) = when (line.kind) {
-                        DiffLine.Kind.Added -> "+" to colors.toolOk
-                        DiffLine.Kind.Removed -> "−" to colors.toolError
+                        DiffLine.Kind.Added -> "+" to colors.toolOkText
+                        DiffLine.Kind.Removed -> "−" to colors.toolErrorText
                         DiffLine.Kind.Header -> "" to colors.textTertiary
                         DiffLine.Kind.Context -> " " to colors.textSecondary
                     }

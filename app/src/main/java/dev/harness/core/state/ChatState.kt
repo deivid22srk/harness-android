@@ -3,6 +3,7 @@ package dev.harness.core.state
 import dev.harness.core.rpc.ContentBlock
 import dev.harness.core.rpc.PiMessage
 import dev.harness.core.rpc.ToolCall
+import androidx.compose.runtime.Immutable
 import dev.harness.core.rpc.Usage
 
 /** Model metadata as reported by `get_state` / `get_available_models`. */
@@ -16,6 +17,7 @@ data class ModelInfo(
 enum class ToolStatus { Running, Ok, Error, Cancelled }
 
 /** One line in the chat transcript. */
+@Immutable
 sealed interface ChatItem {
     val id: String
 
@@ -81,6 +83,7 @@ data class DiffLine(val kind: Kind, val text: String) {
 enum class AgentStatus { Idle, WaitingModel, Streaming, RunningTools, Compacting, Retrying }
 
 /** The complete, immutable UI state derived purely from Pi events. */
+@Immutable
 data class ChatState(
     val items: List<ChatItem> = emptyList(),
     val status: AgentStatus = AgentStatus.Idle,

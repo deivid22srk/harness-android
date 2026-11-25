@@ -52,7 +52,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -130,24 +132,34 @@ fun ChatScreen(
                 isBusy = uiState.chat.isBusy,
                 lastPrompt = viewModel.lastPromptForRegeneration(),
                 onRegenerate = viewModel::regenerate,
-                onEditResend = { text -> viewModel.send(text) },
+                onEditResend = viewModel::requestEditResend,
                 onSuggestion = viewModel::send,
             )
         }
 
-        Composer(
-            state = uiState.chat,
-            pendingImages = uiState.pendingImages,
-            draftKey = uiState.activeProject?.hostPath ?: "draft",
-            queueSize = uiState.chat.steeringQueue.size + uiState.chat.followUpQueue.size,
-            onSend = viewModel::send,
-            onQueue = viewModel::steer,
-            onStop = viewModel::stopAgent,
-            onOpenModelPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Model, true) },
-            onOpenThinkingPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Thinking, true) },
-            onAttach = { viewModel.setPicker(HarnessViewModel.Pickers.Attach, true) },
-            onRemoveImage = viewModel::removePendingImage,
-        )
+        // Draft state is scoped per project: key() disposes on switch and the
+        // holder restores the exact draft when returning to a project.
+        val draftKey = uiState.activeProject?.hostPath ?: "draft"
+        val draftHolder = rememberSaveableStateHolder()
+        key(draftKey) {
+            draftHolder.SaveableStateProvider(draftKey) {
+                Composer(
+                    state = uiState.chat,
+                    pendingImages = uiState.pendingImages,
+                    draftKey = draftKey,
+                    queueSize = uiState.chat.steeringQueue.size + uiState.chat.followUpQueue.size,
+                    onSend = viewModel::send,
+                    onQueue = viewModel::steer,
+                    prefill = uiState.composerPrefill,
+                    prefillToken = uiState.composerPrefillToken,
+                    onStop = viewModel::stopAgent,
+                    onOpenModelPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Model, true) },
+                    onOpenThinkingPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Thinking, true) },
+                    onAttach = { viewModel.setPicker(HarnessViewModel.Pickers.Attach, true) },
+                    onRemoveImage = viewModel::removePendingImage,
+                )
+            }
+        }
     }
 
     if (uiState.showModelPicker) {

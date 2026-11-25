@@ -164,7 +164,7 @@ fun HNoticeSnackbarHost(
         val colors = HarnessTheme
         val (container, content) = when (level) {
             NoticeLevel.Error -> colors.toolErrorContainer to colors.toolErrorText
-            NoticeLevel.Warning -> colors.toolRunningContainer to colors.toolRunning
+            NoticeLevel.Warning -> colors.toolRunningContainer to colors.toolWarningText
             NoticeLevel.Info -> colors.accentContainer to colors.onAccentContainer
         }
         Snackbar(

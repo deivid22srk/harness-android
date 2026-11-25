@@ -79,6 +79,9 @@ data class HarnessUiState(
     val pendingUi: List<ExtensionUiRequest> = emptyList(),
     // Composer attachments
     val pendingImages: List<PendingImage> = emptyList(),
+    // "Editar e reenviar": prefill pushed into the composer (token forces the effect)
+    val composerPrefill: String? = null,
+    val composerPrefillToken: Int = 0,
     // Chat model list for the composer picker (already filtered by selection)
     val chatModels: List<Pair<String, String>> = emptyList(),
     // Appearance
@@ -142,8 +145,12 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         }
         viewModelScope.launch {
             container.session.state.collect { chat ->
-                _ui.value = _ui.value.copy(chat = chat)
-                refreshChatModels(chat)
+                // Skip recomposition when nothing visibly changed (streaming
+                // publishes ~30 fps; equal states must not emit).
+                if (_ui.value.chat != chat) {
+                    _ui.value = _ui.value.copy(chat = chat)
+                    refreshChatModels(chat)
+                }
             }
         }
         viewModelScope.launch {
@@ -375,11 +382,19 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         }
         lastPrompt = text
         lastImages = images
-        _ui.value = _ui.value.copy(pendingImages = emptyList())
+        _ui.value = _ui.value.copy(pendingImages = emptyList(), composerPrefill = null)
     }
 
     fun steer(text: String) {
         viewModelScope.launch { container.session.steer(text) }
+    }
+
+    /** Prefills the composer with a past message so the user can edit it. */
+    fun requestEditResend(text: String) {
+        _ui.value = _ui.value.copy(
+            composerPrefill = text,
+            composerPrefillToken = _ui.value.composerPrefillToken + 1,
+        )
     }
 
     fun stopAgent() {
@@ -439,7 +454,9 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             chat.model != null -> listOf(chat.model.provider to chat.model.id)
             else -> emptyList()
         }
-        _ui.value = _ui.value.copy(chatModels = models)
+        if (_ui.value.chatModels != models) {
+            _ui.value = _ui.value.copy(chatModels = models)
+        }
     }
 
     fun respondExtensionUi(request: ExtensionUiRequest, value: String?, confirmed: Boolean?, cancelled: Boolean) {

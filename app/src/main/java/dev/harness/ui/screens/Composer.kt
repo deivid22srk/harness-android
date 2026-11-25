@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -69,6 +70,8 @@ fun Composer(
     queueSize: Int,
     onSend: (String) -> Unit,
     onQueue: (String) -> Unit,
+    prefill: String? = null,
+    prefillToken: Int = 0,
     onStop: () -> Unit,
     onOpenModelPicker: () -> Unit,
     onOpenThinkingPicker: () -> Unit,
@@ -77,8 +80,14 @@ fun Composer(
     modifier: Modifier = Modifier,
 ) {
     val colors = HarnessTheme
-    // Draft is keyed per project: changing project resets (and restores its own).
-    var text by rememberSaveable(draftKey, key = "composer_draft") { mutableStateOf("") }
+    // Draft is scoped per project by the SaveableStateProvider around this
+    // composable (restores correctly per project, survives process death).
+    var text by rememberSaveable { mutableStateOf("") }
+
+    // "Editar e reenviar" pushes the past message into the field.
+    LaunchedEffect(prefillToken) {
+        prefill?.let { text = it }
+    }
 
     val busy = state.isBusy
     val canSend = text.isNotBlank()

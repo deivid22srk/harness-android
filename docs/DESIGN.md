@@ -13,7 +13,7 @@ Dark-first. A paleta foi validada por script (`scripts/contrast_check.py`):
 todos os pares texto/fundo ≥ 4.5:1 (WCAG AA). `primary` de marca (#7C5CFF) é
 usado em contêineres/foco; o botão preenchido usa `accentButton` (#6841E0,
 6.14:1 com rótulo branco) e texto pequeno em tom de marca usa `accentText`
-(#A18BFF, 7.04:1) — os três casos ficam acima de AA.
+(#A18BFF, 7.04:1) — os três casos ficam acima de AA. Na rodada 02 do Crítico, os pares de **texto em difs/código** e do **snackbar de aviso** no tema claro também foram auditados: novos slots `toolOkText` (#067647), `toolWarningText` (#93370D) e reuso de `toolErrorText` (#B42318) passam em AA sobre `codeBackground` e contêineres (5,1–6,5:1), verificados por `scripts/contrast_check.py` (37 pares PASS AA, 0 FAIL).
 
 | Token | Escuro | Claro | Uso |
 |---|---|---|---|

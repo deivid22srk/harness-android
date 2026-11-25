@@ -22,7 +22,8 @@ DARK = {
     'bg': '#0B0E14', 'surface': '#12161F', 'surfaceVar': '#1A1F2B',
     'outline': '#2A3040', 'primary': '#7C5CFF', 'secondary': '#22D3EE',
     'success': '#34D399', 'warning': '#FBBF24', 'error': '#F87171',
-    'text': '#E8EBF3', 'text2': '#9AA3B8', 'text3': '#818CA3',
+    'text': '#E8EBF3', 'text2': '#9AA3B8', 'text3': '#818CA3', 'codeBg': '#0E1219',
+    'okText': '#34D399', 'warnTextOnCont': '#FDE68A', 'warnCont': '#4A3508', 'errText': '#FCA5A5',
     # refinements (round 1 design review)
     'primaryBtn': '#6841E0', 'primaryText': '#A18BFF',
     'primaryCont': '#3B2E80', 'onPrimCont': '#EDE9FF',
@@ -32,7 +33,8 @@ LIGHT = {
     'bg': '#F7F8FB', 'surface': '#FFFFFF', 'surfaceVar': '#EEF0F6',
     'outline': '#D5D9E4', 'primary': '#5B3FE0', 'secondary': '#0891B2',
     'success': '#059669', 'warning': '#B45309', 'error': '#DC2626',
-    'text': '#0F1320', 'text2': '#5A6378', 'text3': '#646D82',
+    'text': '#0F1320', 'text2': '#5A6378', 'text3': '#646D82', 'codeBg': '#F1F3F9',
+    'okText': '#067647', 'warnTextOnCont': '#93370D', 'warnCont': '#FCEDD4', 'errText': '#B42318',
     # refinements
     'primaryCont': '#E4DCFF', 'onPrimCont': '#2A2050',
     'secondaryText': '#0E7490', 'successText': '#067647', 'errorText': '#B42318',
@@ -62,6 +64,10 @@ pairs_light = [
     ('warningText/surface', 'warningText', 'surface'),
     ('errorText/surface', 'errorText', 'surface'), ('errorText/surfaceVar', 'errorText', 'surfaceVar'),
     ('error/surfaceVar (icons/large)', 'error', 'surfaceVar'),
+    ('okText/surface (diff + lines)', 'okText', 'surface'),
+    ('okText/codeBg (diff + lines)', 'okText', 'codeBg'),
+    ('errText/codeBg (diff - lines)', 'errText', 'codeBg'),
+    ('warnTextOnCont/warnCont (snackbar)', 'warnTextOnCont', 'warnCont'),
 ]
 
 

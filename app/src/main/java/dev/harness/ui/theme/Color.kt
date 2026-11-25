@@ -37,6 +37,8 @@ val DarkError = Color(0xFFF87171)
 val DarkErrorText = Color(0xFFFCA5A5) // error small text = 10.18:1
 val DarkErrorContainer = Color(0xFF4A1A1C)
 val DarkOnErrorContainer = Color(0xFFFFD9D6)
+val DarkToolOkText = Color(0xFF34D399) // ok text on code bg = 9.76:1
+val DarkToolWarningText = Color(0xFFFDE68A) // warning text on warning container
 val DarkCodeBackground = Color(0xFF0E1219)
 val DarkUserBubble = Color(0xFF232945)
 val DarkScrim = Color(0x99000000)
@@ -71,6 +73,8 @@ val LightError = Color(0xFFDC2626)
 val LightErrorText = Color(0xFFB42318)
 val LightErrorContainer = Color(0xFFFDD9D6)
 val LightOnErrorContainer = Color(0xFF5C110B)
+val LightToolOkText = Color(0xFF067647) // ok text = 5.69:1 white / 5.13:1 codeBg
+val LightToolWarningText = Color(0xFF93370D) // 6.52:1 on warning container
 val LightCodeBackground = Color(0xFFF1F3F9)
 val LightUserBubble = Color(0xFFE4DCFF)
 val LightScrim = Color(0x52000000)

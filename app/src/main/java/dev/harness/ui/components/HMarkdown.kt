@@ -148,9 +148,8 @@ internal fun parseInline(
     var idx = 0
     val n = text.length
     while (idx < n) {
-        val rest = text.substring(idx)
         when {
-            rest.startsWith("**") -> {
+            text.startsWith("**", idx) -> {
                 val end = text.indexOf("**", idx + 2)
                 if (end > 0) {
                     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = textColor)) {
@@ -161,7 +160,7 @@ internal fun parseInline(
                     append(text[idx]); idx++
                 }
             }
-            rest.startsWith("~~") -> {
+            text.startsWith("~~", idx) -> {
                 val end = text.indexOf("~~", idx + 2)
                 if (end > 0) {
                     withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = textColor)) {

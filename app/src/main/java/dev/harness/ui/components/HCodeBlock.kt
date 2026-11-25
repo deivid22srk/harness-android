@@ -101,13 +101,13 @@ private val ANNOTATION_PATTERN = Regex("""@[A-Za-z_][A-Za-z0-9_.]*""")
 internal fun highlightCode(code: String, colors: CodeColors): AnnotatedString = buildAnnotatedString {
     var index = 0
     val length = code.length
+    // matchAt on the full string (no per-token substring) keeps this O(n).
     while (index < length) {
-        val rest = code.substring(index)
-        val stringMatch = STRING_PATTERN.matchAt(rest, 0)
-        val commentMatch = COMMENT_PATTERN.matchAt(rest, 0)
-        val annotationMatch = ANNOTATION_PATTERN.matchAt(rest, 0)
-        val numberMatch = NUMBER_PATTERN.matchAt(rest, 0)
-        val wordMatch = KEYWORD_PATTERN.matchAt(rest, 0)
+        val stringMatch = STRING_PATTERN.matchAt(code, index)
+        val commentMatch = COMMENT_PATTERN.matchAt(code, index)
+        val annotationMatch = ANNOTATION_PATTERN.matchAt(code, index)
+        val numberMatch = NUMBER_PATTERN.matchAt(code, index)
+        val wordMatch = KEYWORD_PATTERN.matchAt(code, index)
         val token: String = when {
             stringMatch != null -> stringMatch.value
             commentMatch != null -> commentMatch.value
@@ -117,7 +117,7 @@ internal fun highlightCode(code: String, colors: CodeColors): AnnotatedString = 
             else -> ""
         }
         if (token.isEmpty()) {
-            append(rest[0])
+            append(code[index])
             index++
             continue
         }
