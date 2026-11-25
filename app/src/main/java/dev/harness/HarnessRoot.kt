@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.harness.R
 import dev.harness.core.rpc.ExtensionUiRequest
 import dev.harness.ui.components.HNoticeSnackbarHost
@@ -29,6 +30,7 @@ import dev.harness.ui.components.touchTargetClickable
 import dev.harness.ui.screens.ChatScreen
 import dev.harness.ui.screens.OnboardingScreen
 import dev.harness.ui.screens.ProjectsScreen
+import dev.harness.ui.screens.SessionsScreen
 import dev.harness.ui.screens.SettingsScreen
 import dev.harness.ui.theme.HarnessTheme
 import dev.harness.ui.theme.Radii
@@ -47,11 +49,20 @@ fun HarnessRoot(
 ) {
     val colors = HarnessTheme
     val snackbarHostState = remember { SnackbarHostState() }
+    val sessionsViewModel: SessionsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = SessionsViewModel.factory(viewModel.appForFactory()),
+    )
+    val sessionsState by sessionsViewModel.uiState.collectAsStateWithLifecycle()
 
-    BackHandler(enabled = uiState.screen == Screen.Settings || uiState.screen == Screen.Chat) {
+    BackHandler(
+        enabled = uiState.screen == Screen.Settings ||
+            uiState.screen == Screen.Chat ||
+            uiState.screen == Screen.Sessions,
+    ) {
         when (uiState.screen) {
             Screen.Settings -> viewModel.backToProjects()
             Screen.Chat -> viewModel.backToProjects()
+            Screen.Sessions -> viewModel.backFromSessions()
             else -> Unit
         }
     }
@@ -77,6 +88,15 @@ fun HarnessRoot(
             Screen.Chat -> ChatScreen(
                 uiState = uiState,
                 viewModel = viewModel,
+                sessionsState = sessionsState,
+                sessionsViewModel = sessionsViewModel,
+            )
+
+            Screen.Sessions -> SessionsScreen(
+                sessionsState = sessionsState,
+                harnessState = uiState,
+                sessionsViewModel = sessionsViewModel,
+                harnessViewModel = viewModel,
             )
         }
 

@@ -14,6 +14,8 @@ import dev.harness.core.pi.ConnectionState
 import dev.harness.core.pi.ImageAttachment
 import dev.harness.core.projects.Project
 import dev.harness.core.rpc.ExtensionUiRequest
+import dev.harness.core.sessions.SessionRepository
+import dev.harness.core.sessions.SessionSummary
 import dev.harness.core.settings.CustomProvider
 import dev.harness.core.settings.Provider
 import dev.harness.core.state.ChatState
@@ -29,7 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-enum class Screen { Onboarding, Projects, Chat, Settings }
+enum class Screen { Onboarding, Projects, Chat, Settings, Sessions }
 
 /** A model listed in the "Obter modelos" dialog. */
 data class ModelOption(
@@ -100,8 +102,14 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     private val container = (app as HarnessApp).container
     private val appContext: Context get() = app.applicationContext
 
+    /** Session file repository (Pi JSONL listing + active marker). */
+    private val sessionRepo = SessionRepository(container.paths.home, container.paths.stateDir)
+
     private val _ui = MutableStateFlow(HarnessUiState())
     val uiState: StateFlow<HarnessUiState> = _ui.asStateFlow()
+
+    /** Application reference for sibling ViewModel factories (Sessions). */
+    fun appForFactory(): Application = app
 
     /** Last prompt sent in the current session — powers "regenerar". */
     private var lastPrompt: String? = null
@@ -114,6 +122,9 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
 
     /** Launch config of the active session, for restarts. */
     private var activeLaunch: dev.harness.core.pi.PiLaunchConfig? = null
+
+    /** Last session file persisted for the active project (dedup for markers). */
+    private var lastPersistedSessionFile: String? = null
 
     init {
         val settings = container.settings
@@ -150,6 +161,19 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
                 if (_ui.value.chat != chat) {
                     _ui.value = _ui.value.copy(chat = chat)
                     refreshChatModels(chat)
+                }
+                // Persist which session file is active for the open project
+                // so the next launch can resume instantly (acceptance §4.1.1).
+                val file = chat.sessionFile
+                val project = _ui.value.activeProject
+                if (file != null && project != null) {
+                    val host = runCatching { sessionRepo.guestToHostPath(file) }.getOrNull()
+                    if (host != null && host != lastPersistedSessionFile) {
+                        lastPersistedSessionFile = host
+                        withContext(Dispatchers.IO) {
+                            runCatching { sessionRepo.setLastSessionFile(project, host) }
+                        }
+                    }
                 }
             }
         }
@@ -310,12 +334,29 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     fun openProject(project: Project) {
         // Returning to the project that is already running must NOT relaunch
         // the agent: just switch the screen and keep the live session.
-        val resuming = _ui.value.activeProject?.hostPath == project.hostPath &&
-            _ui.value.connection.let { it == ConnectionState.Connected || it == ConnectionState.Starting } &&
-            _ui.value.chat.items.isNotEmpty()
-        _ui.value = _ui.value.copy(activeProject = project, screen = Screen.Chat)
-        if (resuming) return
+        val live = _ui.value.activeProject?.hostPath == project.hostPath &&
+            _ui.value.connection.let { it == ConnectionState.Connected || it == ConnectionState.Starting }
+        _ui.value = _ui.value.copy(activeProject = project)
+        if (live) {
+            _ui.value = _ui.value.copy(screen = Screen.Chat)
+            return
+        }
+        if (container.settings.resumeLastSession) {
+            _ui.value = _ui.value.copy(screen = Screen.Chat)
+            startPiAndResume(project)
+        } else {
+            // The user prefers to pick a session; the Pi starts lazily when
+            // one is opened or created.
+            _ui.value = _ui.value.copy(screen = Screen.Sessions)
+        }
+    }
 
+    /**
+     * Starts the Pi for a project and resumes its last session. The resume
+     * target is the persisted active-session marker, falling back to the
+     * newest session file in the project's deterministic session directory.
+     */
+    private fun startPiAndResume(project: Project) {
         AgentService.start(appContext)
         viewModelScope.launch {
             val config = container.launchConfig().copy(
@@ -323,7 +364,128 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
                 sessionName = project.name,
             )
             activeLaunch = config
+            lastPersistedSessionFile = null
+            val started = container.session.start(config)
+            if (!started) return@launch
+            val resumeHost = withContext(Dispatchers.IO) {
+                runCatching {
+                    sessionRepo.lastSessionFileFor(project) ?: sessionRepo.newestSessionFile(project)
+                }.getOrNull()
+            }
+            if (resumeHost != null) {
+                val guest = sessionRepo.hostToGuestPath(resumeHost)
+                val switched = container.session.switchToSession(guest)
+                if (!switched) {
+                    setNotice(
+                        UiNotice(appContext.getString(R.string.sessions_resume_failed), NoticeLevel.Warning),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Opens the sessions list for the active project (chat top-bar shortcut). */
+    fun openSessions() {
+        _ui.value = _ui.value.copy(screen = Screen.Sessions)
+    }
+
+    /** Back from the sessions list: to the chat when one is open, else projects. */
+    fun backFromSessions() {
+        val chatAlive = _ui.value.connection.let { it == ConnectionState.Connected || it == ConnectionState.Starting }
+        _ui.value = _ui.value.copy(
+            screen = if (chatAlive && _ui.value.activeProject != null) Screen.Chat else Screen.Projects,
+        )
+        if (_ui.value.screen == Screen.Projects) loadProjects()
+    }
+
+    /**
+     * Opens a session from the list. Starts the Pi lazily when there is no
+     * live session; aborts safely before switching if the agent is busy
+     * (acceptance §4.1.7 — abort preserves the session file).
+     */
+    fun openSession(summary: SessionSummary) {
+        val project = _ui.value.activeProject ?: return
+        _ui.value = _ui.value.copy(screen = Screen.Chat)
+        viewModelScope.launch {
+            val connected = _ui.value.connection == ConnectionState.Connected
+            if (!connected) {
+                val config = container.launchConfig().copy(
+                    workDirGuest = project.guestPath,
+                    sessionName = project.name,
+                )
+                activeLaunch = config
+                lastPersistedSessionFile = null
+                AgentService.start(appContext)
+                val started = container.session.start(config)
+                if (!started) return@launch
+            }
+            val guest = sessionRepo.hostToGuestPath(summary.file)
+            val alreadyActive = _ui.value.chat.sessionFile == guest
+            if (!alreadyActive) {
+                container.session.switchToSession(guest)
+            }
+        }
+    }
+
+    /** Starts a fresh session in the active project (from the sessions list). */
+    fun startNewSessionInProject() {
+        val project = _ui.value.activeProject ?: return
+        _ui.value = _ui.value.copy(screen = Screen.Chat)
+        startPiAndResumeFresh(project)
+    }
+
+    private fun startPiAndResumeFresh(project: Project) {
+        AgentService.start(appContext)
+        viewModelScope.launch {
+            val config = container.launchConfig().copy(
+                workDirGuest = project.guestPath,
+                sessionName = project.name,
+            )
+            activeLaunch = config
+            lastPersistedSessionFile = null
             container.session.start(config)
+        }
+    }
+
+    /** Renames the ACTIVE session through the Pi (writes session_info). */
+    fun renameActiveSession(name: String) {
+        viewModelScope.launch {
+            val connected = _ui.value.connection == ConnectionState.Connected
+            if (!connected) {
+                setNotice(UiNotice(appContext.getString(R.string.sessions_rename_needs_agent), NoticeLevel.Warning))
+                return@launch
+            }
+            container.session.setSessionName(name)
+        }
+    }
+
+    /**
+     * Duplicates a session (RPC `clone`, which works on the active branch):
+     * switches to the chosen session first, then clones. The Pi ends on the
+     * fresh copy, which becomes the new active session.
+     */
+    fun duplicateSession(summary: SessionSummary) {
+        val project = _ui.value.activeProject ?: return
+        _ui.value = _ui.value.copy(screen = Screen.Chat)
+        viewModelScope.launch {
+            val connected = _ui.value.connection == ConnectionState.Connected
+            if (!connected) {
+                val config = container.launchConfig().copy(
+                    workDirGuest = project.guestPath,
+                    sessionName = project.name,
+                )
+                activeLaunch = config
+                lastPersistedSessionFile = null
+                AgentService.start(appContext)
+                val started = container.session.start(config)
+                if (!started) return@launch
+            }
+            val guest = sessionRepo.hostToGuestPath(summary.file)
+            val alreadyActive = _ui.value.chat.sessionFile == guest
+            val switched = alreadyActive || container.session.switchToSession(guest)
+            if (switched) {
+                container.session.cloneActiveSession()
+            }
         }
     }
 
@@ -420,12 +582,19 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         lastPrompt?.takeIf { !_ui.value.chat.isBusy }
 
     fun newSession() {
+        val project = _ui.value.activeProject
         viewModelScope.launch {
-            container.session.newSession()
+            if (project != null && _ui.value.connection != ConnectionState.Connected) {
+                // No live agent (e.g. opened from the sessions list without
+                // resume): start a fresh process instead of a dead RPC call.
+                startPiAndResumeFresh(project)
+            } else {
+                if (_ui.value.chat.isBusy) container.session.abort()
+                container.session.newSession()
+            }
             lastPrompt = null
             lastImages = emptyList()
         }
-        AgentService.stop(appContext)
     }
 
     fun pickModel(provider: String, id: String) {

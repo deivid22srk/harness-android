@@ -1,0 +1,8 @@
+{"type":"session","version":3,"id":"aaaa1111-2222-3333-4444-555555555555","timestamp":"2026-11-20T10:00:00.000Z","cwd":"/root/projects/demo"}
+{"type":"message","id":"e1","parentId":null,"timestamp":"2026-11-20T10:00:01.000Z","message":{"role":"user","content":"Corrija o bug de login","timestamp":1764000001000}}
+{"type":"message","id":"e2","parentId":"e1","timestamp":"2026-11-20T10:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Vou ler o arquivo."},{"type":"toolCall","id":"call_1","name":"read","arguments":{"path":"/src/login.py"}}],"api":"anthropic-messages","provider":"anthropic","model":"claude-sonnet-4-5","stopReason":"toolUse","timestamp":1764000002000}}
+{"type":"message","id":"e3","parentId":"e2","timestamp":"2026-11-20T10:00:03.000Z","message":{"role":"toolResult","toolCallId":"call_1","toolName":"read","content":[{"type":"text","text":"def login(): pass"}],"isError":false,"timestamp":1764000003000}}
+{"type":"message","id":"e4","parentId":"e3","timestamp":"2026-11-20T10:00:04.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Encontrei o problema e corrigi."}],"api":"anthropic-messages","provider":"anthropic","model":"claude-sonnet-4-5","stopReason":"stop","timestamp":1764000004000}}
+{"type":"model_change","id":"e5","parentId":"e4","timestamp":"2026-11-20T10:00:05.000Z","provider":"openai","modelId":"gpt-5"}
+{"type":"session_info","id":"e6","parentId":"e5","timestamp":"2026-11-20T10:00:06.000Z","name":"Correção de login"}
+{"type":"usage","id":"e7","parentId":"e6","timestamp":"2026-11-20T10:00:07.000Z","kind":"cache_warm","provider":"anthropic","model":"claude-sonnet-4-5","usage":{"input":0,"output":0,"totalTokens":10}}

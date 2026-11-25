@@ -208,4 +208,35 @@
     <string name="a11y_expand">Expandir %1$s</string>
     <string name="a11y_collapse">Recolher %1$s</string>
     <string name="a11y_open_settings">Abrir configurações</string>
+    <string name="a11y_open_sessions">Ver sessões</string>
+
+    <!-- Sessions -->
+    <string name="sessions_title">Sessões do projeto</string>
+    <string name="sessions_search_hint">Buscar sessões</string>
+    <string name="sessions_new">Nova sessão</string>
+    <string name="sessions_active">Ativa</string>
+    <string name="sessions_untitled">Sem nome</string>
+    <string name="sessions_rename">Renomear</string>
+    <string name="sessions_rename_title">Renomear sessão</string>
+    <string name="sessions_rename_label">Nome da sessão</string>
+    <string name="sessions_duplicate">Duplicar</string>
+    <string name="sessions_delete">Excluir</string>
+    <string name="sessions_delete_title">Excluir sessão?</string>
+    <string name="sessions_delete_body">A sessão \"%1$s\" e todo o histórico dela serão apagados. Esta ação não pode ser desfeita depois do aviso fechado.</string>
+    <string name="sessions_deleted_snackbar">Sessão \"%1$s\" excluída</string>
+    <string name="sessions_undo">Desfazer</string>
+    <string name="sessions_actions_a11y">Ações da sessão %1$s</string>
+    <string name="sessions_message_count">%1$d mensagens</string>
+    <string name="sessions_empty_title">Nenhuma sessão ainda</string>
+    <string name="sessions_empty_body">Converse com o agente para criar a primeira sessão. Cada projeto guarda as próprias sessões, com o histórico completo.</string>
+    <string name="sessions_search_empty_title">Nada encontrado</string>
+    <string name="sessions_search_empty_body">Nenhuma sessão corresponde à busca.</string>
+    <string name="sessions_error_title">Não foi possível ler as sessões</string>
+    <string name="sessions_resume_failed">Não foi possível retomar a última sessão; uma sessão nova foi aberta.</string>
+    <string name="sessions_rename_needs_agent">Conecte-se ao projeto para renomear a sessão ativa.</string>
+    <string name="time_now">agora</string>
+    <string name="time_minutes">há %1$d min</string>
+    <string name="time_hours">há %1$d h</string>
+    <string name="time_days">há %1$d d</string>
+    <string name="time_months">há %1$d meses</string>
 </resources>

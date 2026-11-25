@@ -312,6 +312,10 @@ data class PiMessage(
     val toolCallId: String?,
     val toolName: String?,
     val isError: Boolean,
+    /** BashExecutionMessage fields (role "bashExecution"); null otherwise. */
+    val command: String? = null,
+    val output: String? = null,
+    val exitCode: Int? = null,
 ) {
     val toolCalls: List<ToolCall> get() = blocks.filterIsInstance<ContentBlock.ToolCallBlock>().map { it.call }
 
@@ -334,6 +338,9 @@ data class PiMessage(
                 toolCallId = obj["toolCallId"]?.str(),
                 toolName = obj["toolName"]?.str(),
                 isError = obj["isError"]?.jsonPrimitive?.booleanOrNull ?: false,
+                command = obj["command"]?.str(),
+                output = obj["output"]?.str(),
+                exitCode = obj["exitCode"]?.jsonPrimitive?.intOrNull,
             )
         }
 

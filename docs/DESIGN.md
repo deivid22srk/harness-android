@@ -129,3 +129,45 @@ rodada de polimento guiada pelo Crítico.
 | Ok | `toolOk` | "concluído" |
 | Erro | `toolError` | "erro" |
 | Cancelado | `textTertiary` | "cancelado" |
+
+## 8. Sessões por projeto (frente A)
+
+O Pi 1.6.0 grava cada conversa em `~/.pi/agent/sessions/--<cwd>--/<timestamp>_<id>.jsonl`
+(docs `session-format.md`; convenção verificada empiricamente — pontos e hífens
+preservados, apenas `/`, `\`, `:` viram `-`). Como o app sempre abre o Pi no
+`cwd` do projeto (`/root/projects/<nome>`), o diretório de sessões de cada
+projeto é **determinístico e permanente** — é essa propriedade que sustenta o
+recurso, não uma cópia local do histórico.
+
+Padrões novos:
+
+- **`SessionRepository` (`core/sessions/`)** — lista/resume/renomeia/exclui
+  sessões lendo os JSONL **sem subir o Pi**. Sumário via gate regex +
+  dispatch pelo tipo *parseado* (`session`/`message`/`session_info`/
+  `model_change`); arquivo truncado/corrompido degrada (`corrupt`/`truncated`)
+  sem quebrar. Fonte da verdade segue sendo o arquivo do Pi; o app só guarda
+  o marcador "última sessão ativa por projeto" (`files/state/last-session.properties`).
+- **Retomada** — abrir um projeto inicia o Pi e envia `switch_session` →
+  `get_messages` → `ChatState` reconstruído por `SessionHydrator` (inclui
+  cards de tool call com resultado/erro/cancelado, diffs de `edit`, execuções
+  `bash` como avisos). Configurável ("Retomar última sessão", padrão: ligado);
+  desligado, abrir o projeto mostra a lista de sessões sem subir o Pi.
+- **Tela "Sessões do projeto"** — busca, itens com título (nome, senão
+  primeira mensagem), data relativa, contagem, modelo, selo "Ativa"; menu por
+  item (renomear/duplicar/excluir) com confirmação + snackbar de desfazer (6 s);
+  botão "Nova sessão" em destaque; estados esqueleto/vazio/erro com retry.
+  Ação destructiva na sessão **ativa** é bloqueada com mensagem clara
+  (trocar antes de excluir) — nunca corromper estado (aceite §4.1.7).
+- **Troca segura** — trocar/duplicar com o agente ocupando CPU faz `abort`
+  antes do `switch_session`; a sessão abortada permanece no disco.
+- **Top bar do chat** — nome da sessão tocável (renomear via RPC
+  `set_session_name`) + ícone de acesso rápido à lista.
+- **Prova objetiva em CI** — `scripts/session-persistence.js` (chamado pelo
+  job `smoke`): fixture em formato real → `switch_session` → `get_messages` →
+  `kill -9` → processo novo → mesma sessão → histórico idêntico (`SESSIONS_OK`).
+
+## 9. Navegação (atualização)
+
+`Screen` ganhou `Sessions`. Fluxos: Projects → Chat (retoma) ou Projects →
+Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
+(`backFromSessions` volta ao Chat quando há sessão viva, senão aos Projetos).

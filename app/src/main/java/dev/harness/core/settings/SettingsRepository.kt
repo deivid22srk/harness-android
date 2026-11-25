@@ -97,6 +97,14 @@ class SettingsRepository(context: Context) {
         get() = prefs.getBoolean(KEY_BATTERY_PROMPT, false)
         set(v) = prefs.edit().putBoolean(KEY_BATTERY_PROMPT, v).apply()
 
+    /**
+     * Sessions: retomar automaticamente a última sessão ao abrir um projeto
+     * (padrão: true — com atalho visível para ver todas, PROMPT §4.1.2).
+     */
+    var resumeLastSession: Boolean
+        get() = prefs.getBoolean(KEY_RESUME_SESSION, true)
+        set(v) = prefs.edit().putBoolean(KEY_RESUME_SESSION, v).apply()
+
     // ---------------------------------------------------------------------
     // Custom providers
     // ---------------------------------------------------------------------
@@ -206,6 +214,7 @@ class SettingsRepository(context: Context) {
         const val KEY_FONT_SCALE = "font_scale"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_BATTERY_PROMPT = "battery_prompt_shown"
+        const val KEY_RESUME_SESSION = "resume_last_session"
         const val KEY_CUSTOM_PROVIDERS = "custom_providers"
         const val KEY_SELECTED_PREFIX = "selected_models_"
     }

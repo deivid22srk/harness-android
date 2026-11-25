@@ -28,6 +28,9 @@ class HarnessPaths(context: Context) {
     val exports = File(filesDir, "exports")
     val logs = File(filesDir, "logs")
 
+    /** App-owned state (markers, indexes) that is NOT part of the guest rootfs. */
+    val stateDir = File(filesDir, "state")
+
     /** Directory where Android extracts the packaged .so files; they are executable. */
     val nativeLibDir: File = File(context.applicationInfo.nativeLibraryDir)
     val prootBinary = File(nativeLibDir, "libproot.so")
@@ -39,7 +42,7 @@ class HarnessPaths(context: Context) {
             prootLoader.exists() && prootLoader.length() > 0
 
     fun ensureDirs() {
-        listOf(envDir, home, projects, piDir, tmp, exports, logs).forEach { it.mkdirs() }
+        listOf(envDir, home, projects, piDir, tmp, exports, logs, stateDir).forEach { it.mkdirs() }
     }
 
     /** Absolute path as seen by the guest (PRoot makes real paths start with the rootfs). */
