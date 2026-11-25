@@ -28,7 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -282,9 +285,7 @@ private fun ExtensionUiDialog(
     onRespond: (value: String?, confirmed: Boolean?, cancelled: Boolean) -> Unit,
 ) {
     val colors = HarnessTheme
-    var draft by androidx.compose.runtime.remember(request.id) {
-        androidx.compose.runtime.mutableStateOf(request.prefill.orEmpty())
-    }
+    var draft by remember(request.id) { mutableStateOf(request.prefill.orEmpty()) }
     androidx.compose.ui.window.Dialog(onDismissRequest = { onRespond(null, null, true) }) {
         Column(
             Modifier

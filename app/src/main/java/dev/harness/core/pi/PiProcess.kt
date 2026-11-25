@@ -29,7 +29,10 @@ class PiProcess(
 ) {
     private var running: ProcessRunner.Running? = null
 
-    val isAlive: Boolean get() = running?.process?.isAlive == true
+    /** The underlying OS process, or null when stopped. */
+    val process: Process? get() = running?.process
+
+    val isAlive: Boolean get() = process?.isAlive == true
 
     @Synchronized
     fun start(config: PiLaunchConfig): ProcessRunner.Running {

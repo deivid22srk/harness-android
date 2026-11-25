@@ -9,7 +9,6 @@ object ProcessRunner {
         val process: Process,
         val argv: List<String>,
     ) {
-        val pid: Long get() = process.pid()
         fun destroy() {
             process.destroy()
             if (process.isAlive) process.destroyForcibly()

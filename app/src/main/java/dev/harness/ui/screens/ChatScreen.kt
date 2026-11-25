@@ -27,8 +27,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -145,7 +145,7 @@ private fun AssistantBlock(item: ChatItem.AssistantMessage) {
             ) {
                 Text("Raciocínio", style = MaterialTheme.typography.labelLarge, color = colors.textTertiary)
                 Icon(
-                    if (open) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                    if (open) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     tint = colors.textTertiary,
                     modifier = Modifier.size(14.dp),

@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -147,7 +147,7 @@ fun Composer(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (busy) Icons.Default.Close else Icons.Default.Send,
+                    imageVector = if (busy) Icons.Default.Close else Icons.AutoMirrored.Filled.Send,
                     contentDescription = if (busy) "Parar" else "Enviar",
                     tint = if (canSend || busy) colors.textPrimary else colors.textTertiary,
                     modifier = Modifier.size(20.dp),
@@ -164,7 +164,7 @@ private fun ComposerChip(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .clip(Radii.pill)
             .background(colors.surface)
-            .border(1.dp, colors.border, Radii.pill)
+            .border(1.dp, colors.border, RoundedCornerShape(Radii.pill))
             .clickable(onClick = onClick)
             .padding(horizontal = Space.md, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

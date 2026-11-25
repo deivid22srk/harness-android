@@ -99,9 +99,14 @@ class AgentSession(
         pi = process
         drainStderr(process)
 
+        val osProcess = process.process ?: run {
+            connectionFlow.value = ConnectionState.Failed
+            publish(ChatState(error = "O processo do agente não iniciou."))
+            return false
+        }
         val client = RpcClient(
-            stdin = process.process.outputStream,
-            stdout = process.process.inputStream,
+            stdin = osProcess.outputStream,
+            stdout = osProcess.inputStream,
             scope = scope,
         )
         rpc = client
@@ -356,10 +361,11 @@ class AgentSession(
     }
 
     private fun drainStderr(process: PiProcess) {
+        val osProcess = process.process ?: return
         stderrJob?.cancel()
         stderrJob = scope.launch(Dispatchers.IO) {
             runCatching {
-                process.process.errorStream.bufferedReader().useLines { lines ->
+                osProcess.errorStream.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
                         stderrTail.addLast(line)
                         if (stderrTail.size > 200) stderrTail.removeFirst()
@@ -370,8 +376,9 @@ class AgentSession(
     }
 
     private fun watchProcess(process: PiProcess) {
+        val osProcess = process.process ?: return
         scope.launch(Dispatchers.IO) {
-            val exit = runCatching { process.process.waitFor() }.getOrDefault(-1)
+            val exit = runCatching { osProcess.waitFor() }.getOrDefault(-1)
             if (connectionFlow.value == ConnectionState.Stopped) return@launch
             connectionFlow.value = ConnectionState.Restarting
             _notices.tryEmit(

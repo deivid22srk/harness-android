@@ -70,7 +70,7 @@ object PiJson {
             "message_start" -> PiEvent.MessageStart(obj["message"]?.let(PiMessage::from))
             "message_end" -> PiEvent.MessageEnd(obj["message"]?.let(PiMessage::from))
             "message_update" -> PiEvent.MessageUpdate(
-                usage = obj["usage"]?.let(Usage::from),
+                usage = (obj["usage"] as? JsonObject)?.let(Usage::from),
                 delta = obj["assistantMessageEvent"]?.let(AssistantStreamEvent::from),
             )
             "tool_execution_start" -> PiEvent.ToolExecutionStart(

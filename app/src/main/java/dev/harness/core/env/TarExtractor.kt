@@ -34,7 +34,7 @@ object TarExtractor {
             if (header.all { it == 0.toByte() }) break // end-of-archive block
 
             val name = (pendingLongName ?: readString(header, 0, 100)).also { pendingLongName = null }
-            val size = readOctal(header, 124, 12)
+            val size = readOctal(header, 124, 12).toLong()
             val typeFlag = header[156].toInt().toChar()
             val linkName = (pendingLongLink ?: readString(header, 157, 100)).also { pendingLongLink = null }
             val prefix = readString(header, 345, 155)
@@ -74,15 +74,12 @@ object TarExtractor {
                     target.parentFile?.mkdirs()
                     writeFile(input, size, target)
                     applyMode(target, mode)
+                    skipFully(input, padding(size))
                 }
                 else -> {
                     // Skip unknown entries (device nodes, fifos) but consume its bytes.
                     skipFully(input, paddedSize(size))
                 }
-            }
-            // Each entry is padded to a 512-byte boundary.
-            if (typeFlag in charArrayOf('0', '5', '1', '2', 0.toChar(), '\u0000')) {
-                skipFully(input, padding(size))
             }
         }
     }
