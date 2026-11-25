@@ -6,13 +6,17 @@
 #   an Alpine rootfs, but on Android it crashes (SIGSYS) the moment a real
 #   dynamic process (Node.js) starts, because the seccomp filter it installs
 #   interacts badly with Bionic's signal handling. Termux ships PRoot built
-#   with the Android toolchain for exactly this reason. We therefore
-#   cross-compile the Termux PRoot fork (which carries the Android patches)
-#   into libproot.so.
+#   with the Android toolchain for exactly this reason, so we cross-compile the
+#   Termux PRoot fork (which carries the Android patches) with the NDK.
 #
-# Outputs (both placed in $OUT):
-#   libproot.so          - the PRoot binary (aarch64, Android)
-#   libproot-loader.so   - PRoot's loader stub (static, aarch64)
+# Outputs (all placed in $OUT, copied into jniLibs/arm64-v8a/):
+#   libproot.so           - the PRoot binary
+#   libproot-loader.so    - PRoot's loader stub
+#   libandroid-shmem.so   - SysV shm↔ashmem shim (Android lacks SysV shm)
+#
+# talloc is linked *statically* into libproot.so, so no talloc library is
+# needed at runtime. Bionic's libc/liblog/libandroid are provided by the
+# platform. The app bundles the .so files above and sets LD_LIBRARY_PATH.
 #
 # Requires: ANDROID_NDK_HOME (or ANDROID_NDK_ROOT) pointing at an NDK r25+.
 set -eu
@@ -30,13 +34,15 @@ if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
     exit 1
 fi
 
-HOST_TAG="linux-x86_64"
+HOST_TAG=""
 for candidate in linux-x86_64 linux-aarch64; do
     if [ -d "$NDK/toolchains/llvm/prebuilt/$candidate" ]; then
         HOST_TAG="$candidate"
         break
     fi
 done
+[ -n "$HOST_TAG" ] || { echo "error: no NDK prebuilt toolchain found" >&2; exit 1; }
+
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/$HOST_TAG"
 API="${ANDROID_API:-26}"
 CC="$TOOLCHAIN/bin/aarch64-linux-android${API}-clang"
@@ -49,28 +55,29 @@ READELF="$TOOLCHAIN/bin/llvm-readelf"
 WORK="$(pwd)/proot-build"
 rm -rf "$WORK"
 mkdir -p "$WORK" "$OUT" "$WORK/sysroot/lib" "$WORK/sysroot/include"
-
-export PATH="$WORK/hostbin:$PATH"
 mkdir -p "$WORK/hostbin"
+export PATH="$WORK/hostbin:$PATH"
 
 # ---------------------------------------------------------------------------
-# 1. libandroid-shmem (static) - Android has no SysV shared memory; Termux
-#    PRoot links this shim that emulates it over ashmem.
+# 1. libandroid-shmem.so - endian/ABI-correct SysV shared memory over ashmem.
 # ---------------------------------------------------------------------------
 echo "==> libandroid-shmem"
 git clone --depth 1 --branch "$SHMEM_REF" https://github.com/termux/libandroid-shmem.git "$WORK/shmem"
 (
     cd "$WORK/shmem"
-    # Android's <paths.h> does not define _PATH_TMP; provide it for the shim.
-    "$CC" -static -fPIC -O2 -D_PATH_TMP='"/tmp/"' -c shmem.c -o shmem.o
-    "$AR" rcs libandroid-shmem.a shmem.o
-    cp shmem.h "$WORK/sysroot/include/"
-    cp libandroid-shmem.a "$WORK/sysroot/lib/"
+    # Android's <paths.h> does not define _PATH_TMP; the shim needs it.
+    "$CC" -fPIC -O2 -D_PATH_TMP='"/tmp/"' -c shmem.c -o shmem.o
+    "$CC" -shared -Wl,--version-script=exports.txt -Wl,-soname,libandroid-shmem.so \
+        -o libandroid-shmem.so shmem.o -llog -landroid
+    mkdir -p "$WORK/sysroot/include/sys"
+    cp shm.h "$WORK/sysroot/include/sys/shm.h"
+    cp libandroid-shmem.so "$WORK/sysroot/lib/"
+    cp libandroid-shmem.so "$OUT/"
 )
 
 # ---------------------------------------------------------------------------
-# 2. talloc (static) - PRoot's memory allocator. Built with Samba's build
-#    system in cross-compile mode (cannot run aarch64 binaries on the runner).
+# 2. talloc (static) - PRoot's allocator. Built with Samba's waf in
+#    cross-compile mode (aarch64 objects cannot run on the runner).
 # ---------------------------------------------------------------------------
 echo "==> talloc $TALLOC_VERSION"
 mkdir -p "$WORK/talloc"
@@ -103,16 +110,16 @@ Checking for HAVE_MREMAP: OK
 Checking for HAVE_INCOHERENT_MMAP: OK
 Checking getconf large file support flags work: OK
 EOF
+# The bundled waf bootstrap shells out to `which`.
+printf '#!/bin/sh\nexec command -v "$1"\n' > "$WORK/hostbin/which"
+chmod +x "$WORK/hostbin/which"
 (
     cd "$WORK/talloc"
-    # A tiny `which` shim: the bundled waf bootstrap uses it.
-    printf '#!/bin/sh\nexec command -v "$1"\n' > "$WORK/hostbin/which"
-    chmod +x "$WORK/hostbin/which"
-    ./configure --prefix="$WORK/sysroot" --disable-rpath --disable-python \
-        --cross-compile --cross-answers=cross-answers.txt \
-        CC="$CC" AR="$AR" > configure.log 2>&1 || { tail -40 configure.log; exit 1; }
+    CFLAGS="-O2 -fPIC" CC="$CC" AR="$AR" PYTHON=python3 ./configure \
+        --prefix="$WORK/sysroot" --disable-rpath --disable-python \
+        --cross-compile --cross-answers=cross-answers.txt > configure.log 2>&1 \
+        || { tail -40 configure.log; exit 1; }
     make -j"$NPROC" > make.log 2>&1 || { tail -40 make.log; exit 1; }
-    # The static archive is assembled from the object files (Termux recipe).
     ( cd bin/default && "$AR" rcu libtalloc.a talloc*.o )
     test -s bin/default/libtalloc.a || { echo "error: libtalloc.a not produced" >&2; exit 1; }
     cp bin/default/libtalloc.a "$WORK/sysroot/lib/"
@@ -120,14 +127,15 @@ EOF
 )
 
 # ---------------------------------------------------------------------------
-# 3. PRoot + loader
+# 3. PRoot + loader (dynamic against Bionic, talloc linked statically).
 # ---------------------------------------------------------------------------
 echo "==> PRoot $PROOT_REF"
 git clone --depth 1 --branch "$PROOT_REF" "$PROOT_REPO" "$WORK/proot"
 cd "$WORK/proot/src"
 
-CFLAGS="-O2 -fPIC -static -DARG_MAX=131072 -I$WORK/sysroot/include"
-LDFLAGS="-static -Wl,-z,noexecstack -L$WORK/sysroot/lib -landroid-shmem -ltalloc"
+CFLAGS="-O2 -fPIC -DARG_MAX=131072 -I$WORK/sysroot/include"
+# -landroid-shmem resolves against the shared shim we bundle; talloc is static.
+LDFLAGS="-Wl,-z,noexecstack -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -Wl,-Bdynamic -landroid-shmem"
 
 echo "==> loader"
 make -j"$NPROC" loader/loader CC="$CC" LD="$CC" AR="$AR" STRIP="$STRIP" CFLAGS="$CFLAGS"
@@ -142,5 +150,5 @@ install -m 0755 loader/loader "$OUT/libproot-loader.so"
 
 echo "==> Done"
 "$READELF" -h "$OUT/libproot.so" 2>/dev/null | grep -E 'Class|Machine|Type' || true
-"$READELF" -d "$OUT/libproot.so" 2>/dev/null | grep -iE 'needed' || echo "(no dynamic dependencies - fully static)"
+"$READELF" -d "$OUT/libproot.so" 2>/dev/null | grep -iE 'needed' || true
 ls -l "$OUT"

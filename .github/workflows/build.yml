@@ -64,6 +64,7 @@ jobs:
           ls -l native/proot/out
           test -s native/proot/out/libproot.so
           test -s native/proot/out/libproot-loader.so
+          test -s native/proot/out/libandroid-shmem.so
 
       - name: Upload PRoot artifact
         uses: actions/upload-artifact@v4
