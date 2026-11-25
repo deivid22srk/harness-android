@@ -229,3 +229,27 @@ Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
 - **Prova em CI**: smoke instala `npm:cc-safety-net@2.8.3` (fixado,
   determinístico), valida o `settings.json` + `pi list`, remove e valida de
   novo (`PACKAGES_OK`).
+
+## 12. Rodada 4 — integração e polimento
+
+- **Modo de steering/follow-up** (§6.1): duas escolhas em Configurações →
+  Chat ("Uma por vez" / "Todas juntas") mapeadas para `set_steering_mode`/
+  `set_follow_up_mode`; aplicadas a cada handshake (`applyQueueModes`) e ao
+  vivo quando o agente está conectado.
+- **Atualizar o Pi** (Ambiente): `pi update` real, com confirmação, bloqueio
+  com agente ocupado e log exibido na própria categoria. NUNCA usado para
+  pacotes (aqueles usam `--extensions`/fonte específica).
+- **Limpar sessões antigas** (Projetos e sessões): mantém as 10 mais recentes,
+  nunca apaga a sessão ativa (Frente A), com confirmação e notice de resultado.
+- **Hub com valor real**: "Pacotes do Pi" mostra "N pacote(s) instalado(s)";
+  a busca do hub indexa palavras-chave por categoria (ex.: "enter" acha Chat).
+- **Explorador paginado**: "Carregar mais" acumula páginas (`from`), retry
+  dedicado no erro da busca.
+- **Swipe para excluir** na lista de sessões (M3 `SwipeToDismissBox`, com
+  desfazer); renomear/duplicar permanecem no menu ⋮ (melhor para TalkBack).
+- **Migração versionada**: `migrated_version` no DataStore (v1) — futuras
+  migrações podem ser encadeadas sem re-importar.
+- **Limitação documentada**: deep links (`harness://settings/{categoria}`)
+  funcionam em cold start e `onNewIntent` (setIntent + LaunchedEffect);
+  entregas fora desses caminhos dependem de recomposição — aceitável na
+  arquitetura sem biblioteca de navegação.

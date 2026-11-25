@@ -235,21 +235,53 @@ private fun SessionList(
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         items(state.visibleSessions, key = { it.file }) { summary ->
-            SessionRow(
-                summary = summary,
-                isActive = summary.file == state.activeSessionFile,
-                onOpen = { harnessViewModel.openSession(summary) },
-                onRename = {
-                    sessionsViewModel.rename(
-                        summary = summary,
-                        newName = it,
-                        isActive = summary.file == state.activeSessionFile,
-                        onActiveRename = harnessViewModel::renameActiveSession,
-                    )
+            val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
+                confirmValueChange = { value ->
+                    if (value == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
+                        sessionsViewModel.delete(summary, summary.file == state.activeSessionFile)
+                        true
+                    } else {
+                        false
+                    }
                 },
-                onDelete = { sessionsViewModel.delete(summary, summary.file == state.activeSessionFile) },
-                onDuplicate = { harnessViewModel.duplicateSession(summary) },
             )
+            androidx.compose.material3.SwipeToDismissBox(
+                state = dismissState,
+                enableDismissFromStartToEnd = false,
+                backgroundContent = {
+                    val colors = HarnessTheme
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(Radii.shapeLg)
+                            .background(colors.toolErrorContainer)
+                            .padding(horizontal = Space.lg),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.sessions_delete),
+                            tint = colors.toolErrorText,
+                        )
+                    }
+                },
+            ) {
+                SessionRow(
+                    summary = summary,
+                    isActive = summary.file == state.activeSessionFile,
+                    onOpen = { harnessViewModel.openSession(summary) },
+                    onRename = {
+                        sessionsViewModel.rename(
+                            summary = summary,
+                            newName = it,
+                            isActive = summary.file == state.activeSessionFile,
+                            onActiveRename = harnessViewModel::renameActiveSession,
+                        )
+                    },
+                    onDelete = { sessionsViewModel.delete(summary, summary.file == state.activeSessionFile) },
+                    onDuplicate = { harnessViewModel.duplicateSession(summary) },
+                )
+            }
         }
     }
 }

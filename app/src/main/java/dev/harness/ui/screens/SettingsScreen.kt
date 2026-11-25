@@ -67,6 +67,8 @@ private data class CategoryEntry(
     val icon: ImageVector,
     val title: String,
     val subtitle: String,
+    /** Search keywords so the hub finds settings by any related term. */
+    val keywords: String = "",
 )
 
 /**
@@ -85,12 +87,18 @@ fun SettingsScreen(
     wideScreen: Boolean = false,
 ) {
     val colors = HarnessTheme
-    val entries = rememberSettingsEntries(uiState, viewModel)
+    var packagesCount by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit, packagesState.global.size, packagesState.projectPackages.size) {
+        packagesCount = viewModel.installedPackagesCount()
+    }
+    val entries = rememberSettingsEntries(uiState, viewModel, packagesCount)
     val query = uiState.settingsSearch.trim()
     val visible = if (query.isEmpty()) {
         entries
     } else {
-        entries.filter { it.title.contains(query, ignoreCase = true) }
+        entries.filter { entry ->
+            entry.title.contains(query, ignoreCase = true) || entry.keywords.contains(query, ignoreCase = true)
+        }
     }
     val searchMisses = query.isNotEmpty() && visible.isEmpty()
 
@@ -259,7 +267,7 @@ private fun SectionContent(
             harnessViewModel = viewModel,
             onBack = viewModel::backToSettingsHub,
         )
-        SettingsSection.Environment -> EnvironmentSection(uiState, viewModel)
+        SettingsSection.Environment -> EnvironmentSection(uiState, viewModel, packagesViewModel)
         SettingsSection.Privacy -> PrivacySection(uiState, viewModel)
         SettingsSection.Diagnostics -> DiagnosticsSection(uiState, viewModel)
         SettingsSection.About -> AboutSection()
@@ -288,6 +296,7 @@ private fun sectionTitle(section: SettingsSection?): String = stringResource(
 private fun rememberSettingsEntries(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
+    packagesCount: Int?,
 ): List<CategoryEntry> {
     val accountTitle = stringResource(R.string.settings_cat_account)
     val keyOk = uiState.providers.any { viewModel.hasApiKey(it.id) }
@@ -322,7 +331,9 @@ private fun rememberSettingsEntries(
         },
     )
     val packagesTitle = stringResource(R.string.settings_cat_packages)
-    val packagesSub = stringResource(R.string.settings_hub_packages_subtitle)
+    val packagesSub = packagesCount?.let {
+        stringResource(R.string.settings_hub_packages_count, it)
+    } ?: stringResource(R.string.settings_hub_packages_subtitle)
     val envTitle = stringResource(R.string.settings_cat_environment)
     val envSub = stringResource(R.string.settings_hub_environment_subtitle)
     val privacyTitle = stringResource(R.string.settings_cat_privacy)
@@ -334,15 +345,15 @@ private fun rememberSettingsEntries(
 
     return remember(accountSub, appearanceSub, chatSub, sessionsSub) {
         listOf(
-            CategoryEntry(SettingsSection.Account, Icons.Default.Person, accountTitle, accountSub),
-            CategoryEntry(SettingsSection.Appearance, Icons.Default.Palette, appearanceTitle, appearanceSub),
-            CategoryEntry(SettingsSection.Chat, Icons.Default.Message, chatTitle, chatSub),
-            CategoryEntry(SettingsSection.Sessions, Icons.Default.History, sessionsTitle, sessionsSub),
-            CategoryEntry(SettingsSection.Packages, Icons.Default.Extension, packagesTitle, packagesSub),
-            CategoryEntry(SettingsSection.Environment, Icons.Default.Memory, envTitle, envSub),
-            CategoryEntry(SettingsSection.Privacy, Icons.Default.Lock, privacyTitle, privacySub),
-            CategoryEntry(SettingsSection.Diagnostics, Icons.Default.BugReport, diagTitle, diagSub),
-            CategoryEntry(SettingsSection.About, Icons.Default.Info, aboutTitle, aboutSub),
+            CategoryEntry(SettingsSection.Account, Icons.Default.Person, accountTitle, accountSub, "chave api provedor modelos raciocínio thinking token"),
+            CategoryEntry(SettingsSection.Appearance, Icons.Default.Palette, appearanceTitle, appearanceSub, "tema claro escuro cores dinâmicas material you fonte"),
+            CategoryEntry(SettingsSection.Chat, Icons.Default.Message, chatTitle, chatSub, "rolagem markdown enter haptic vibração steering follow-up fila entrega"),
+            CategoryEntry(SettingsSection.Sessions, Icons.Default.History, sessionsTitle, sessionsSub, "sessões retomar histórico armazenamento limpar antigas"),
+            CategoryEntry(SettingsSection.Packages, Icons.Default.Extension, packagesTitle, packagesSub, "pacotes npm instalar remover atualizar extensões skills"),
+            CategoryEntry(SettingsSection.Environment, Icons.Default.Memory, envTitle, envSub, "alpine node pi versão atualizar reinstalar ambiente reparar"),
+            CategoryEntry(SettingsSection.Privacy, Icons.Default.Lock, privacyTitle, privacySub, "chave keystore cifrada apagar dados segurança privacidade"),
+            CategoryEntry(SettingsSection.Diagnostics, Icons.Default.BugReport, diagTitle, diagSub, "logs diagnóstico teste copiar"),
+            CategoryEntry(SettingsSection.About, Icons.Default.Info, aboutTitle, aboutSub, "versão licenças links sobre"),
         )
     }
 }

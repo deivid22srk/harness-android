@@ -21,12 +21,14 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
-/** Explorador (busca npm). */
+/** Explorador (busca npm), paginado (from acumulado, como no arquivo do usuário). */
 data class PackageSearchState(
     val query: String = "",
     val results: List<PackageSearchResult> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
+    val hasMore: Boolean = false,
+    private val nextFrom: Int = 0,
 )
 
 /**
@@ -170,6 +172,19 @@ class PackagesViewModel(private val app: Application) : ViewModel() {
         )
     }
 
+    /**
+     * Atualiza o próprio Pi (`pi update`) — chamado SOMENTE pela categoria
+     * Ambiente com confirmação explícita do usuário.
+     */
+    fun updateSelf(onDone: () -> Unit) {
+        if (_ui.value.operation?.running == true) return
+        startOperation(
+            kind = PackageOperation.OpKind.UPDATE,
+            flow = manager.updateSelf(),
+            onDone = onDone,
+        )
+    }
+
     fun updatePackage(pkg: InstalledPackage, onDone: () -> Unit) {
         if (_ui.value.operation?.running == true) return
         if (pkg.pinned) {
@@ -255,14 +270,35 @@ class PackagesViewModel(private val app: Application) : ViewModel() {
         _ui.value = _ui.value.copy(search = _ui.value.search.copy(query = query))
     }
 
+    /** Fresh search (resets pagination). */
     fun search(query: String = _ui.value.search.query) {
         searchJob?.cancel()
-        _ui.value = _ui.value.copy(search = _ui.value.search.copy(loading = true, error = null, results = emptyList()))
+        _ui.value = _ui.value.copy(
+            search = _ui.value.search.copy(query = query, loading = true, error = null, results = emptyList()),
+        )
+        runSearch(from = 0, accumulate = false, query = query)
+    }
+
+    /** "Carregar mais": acumula a página seguinte. */
+    fun loadMore() {
+        val current = _ui.value.search
+        if (current.loading || !current.hasMore) return
+        runSearch(from = current.nextFrom, accumulate = true, query = current.query)
+    }
+
+    private fun runSearch(from: Int, accumulate: Boolean, query: String) {
+        _ui.value = _ui.value.copy(search = _ui.value.search.copy(loading = true, error = null))
         searchJob = viewModelScope.launch {
-            runCatching { manager.searchRegistry(query) }
-                .onSuccess { results ->
+            runCatching { manager.searchRegistry(query, from = from) }
+                .onSuccess { page ->
+                    val current = _ui.value.search
                     _ui.value = _ui.value.copy(
-                        search = _ui.value.search.copy(loading = false, results = results),
+                        search = current.copy(
+                            loading = false,
+                            results = if (accumulate) current.results + page else page,
+                            hasMore = page.size >= 60,
+                            nextFrom = from + page.size,
+                        ),
                     )
                 }
                 .onFailure { t ->

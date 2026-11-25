@@ -130,6 +130,28 @@ class SessionRepository(
     fun newestSessionFile(project: Project): String? =
         listSessionsBlocking(project, limit = 1).firstOrNull()?.file
 
+    /**
+     * "Limpar sessões antigas": deletes all but the newest [keep] sessions of
+     * a project. Never touches the active/last-resumed file even when older.
+     * Returns the number of files deleted.
+     */
+    suspend fun deleteOldSessions(
+        project: Project,
+        keep: Int,
+        activeFile: String?,
+    ): Int = withContext(Dispatchers.IO) {
+        val summaries = listSessionsBlocking(project)
+        val toDelete = summaries
+            .drop(keep)
+            .filter { it.file != activeFile }
+            .map { File(it.file) }
+        var deleted = 0
+        for (f in toDelete) {
+            if (f.delete()) deleted++
+        }
+        deleted
+    }
+
     // ------------------------------------------------------------------
     // Persistence of the active session per project
     // ------------------------------------------------------------------

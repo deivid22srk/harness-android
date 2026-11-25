@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -109,7 +110,8 @@ fun PackagesScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = Space.lg),
+                .padding(horizontal = Space.lg)
+                .widthIn(max = 720.dp),
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(vertical = Space.sm),
@@ -265,11 +267,16 @@ fun PackagesScreen(
                     }
                     packagesState.search.error?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = colors.toolErrorText)
+                        HButton(
+                            text = stringResource(R.string.action_retry),
+                            onClick = { packagesViewModel.search() },
+                            variant = HButtonDefaults.Variant.Secondary,
+                        )
                     }
                     if (packagesState.search.loading) {
                         LoadingPackages()
                     } else {
-                        packagesState.search.results.take(20).forEach { result ->
+                        packagesState.search.results.forEach { result ->
                             SearchResultRow(
                                 name = result.name,
                                 version = result.version,
@@ -279,6 +286,13 @@ fun PackagesScreen(
                                 date = result.date,
                                 features = result.features,
                                 onUse = { sourceDraft = result.installCommand },
+                            )
+                        }
+                        if (packagesState.search.hasMore) {
+                            HButton(
+                                text = stringResource(R.string.packages_load_more),
+                                onClick = packagesViewModel::loadMore,
+                                variant = HButtonDefaults.Variant.Ghost,
                             )
                         }
                     }

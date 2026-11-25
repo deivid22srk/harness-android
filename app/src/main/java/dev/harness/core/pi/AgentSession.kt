@@ -285,6 +285,19 @@ class AgentSession(
         rpc?.call(buildJsonObject { put("type", "set_thinking_level"); put("level", level) })
     }
 
+    /**
+     * Delivery modes for queued messages (rpc-commands.md):
+     * steering = "all"|"one-at-a-time", followUp = same. Applied after the
+     * handshake from the user's Chat preferences.
+     */
+    suspend fun setSteeringMode(mode: String) {
+        rpc?.call(buildJsonObject { put("type", "set_steering_mode"); put("mode", mode) })
+    }
+
+    suspend fun setFollowUpMode(mode: String) {
+        rpc?.call(buildJsonObject { put("type", "set_follow_up_mode"); put("mode", mode) })
+    }
+
     suspend fun setSessionName(name: String) {
         rpc?.call(buildJsonObject { put("type", "set_session_name"); put("name", name) })
     }

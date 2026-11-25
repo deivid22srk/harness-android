@@ -267,6 +267,43 @@ fun ChatSection(
             checked = uiState.hapticFeedback,
             onCheckedChange = viewModel::setHapticFeedback,
         )
+        var steeringSheet by rememberSaveable { mutableStateOf(false) }
+        val queueLabels = listOf(
+            stringResource(R.string.settings_queue_one),
+            stringResource(R.string.settings_queue_all),
+        )
+        val queueIds = listOf("one-at-a-time", "all")
+        SettingsChoiceRow(
+            title = stringResource(R.string.settings_chat_steering),
+            subtitle = stringResource(R.string.settings_chat_steering_note),
+            currentLabel = queueLabels[queueIds.indexOf(uiState.steeringMode).coerceAtLeast(0)],
+            onClick = { steeringSheet = true },
+        )
+        var followUpSheet by rememberSaveable { mutableStateOf(false) }
+        SettingsChoiceRow(
+            title = stringResource(R.string.settings_chat_followup),
+            subtitle = stringResource(R.string.settings_chat_followup_note),
+            currentLabel = queueLabels[queueIds.indexOf(uiState.followUpMode).coerceAtLeast(0)],
+            onClick = { followUpSheet = true },
+        )
+        if (steeringSheet) {
+            dev.harness.ui.components.settings.HBottomSheetChoice(
+                title = stringResource(R.string.settings_chat_steering),
+                options = queueLabels,
+                selectedIndex = queueIds.indexOf(uiState.steeringMode).coerceAtLeast(0),
+                onDismiss = { steeringSheet = false },
+                onSelect = { viewModel.setSteeringMode(queueIds[it]) },
+            )
+        }
+        if (followUpSheet) {
+            dev.harness.ui.components.settings.HBottomSheetChoice(
+                title = stringResource(R.string.settings_chat_followup),
+                options = queueLabels,
+                selectedIndex = queueIds.indexOf(uiState.followUpMode).coerceAtLeast(0),
+                onDismiss = { followUpSheet = false },
+                onSelect = { viewModel.setFollowUpMode(queueIds[it]) },
+            )
+        }
         Spacer(Modifier.height(Space.xl))
     }
 }
@@ -300,7 +337,41 @@ fun SessionsSection(
                 viewModel.setResumeLastSession(it)
             },
         )
+        var showClearOld by rememberSaveable { mutableStateOf(false) }
+        SettingsDangerRow(
+            title = stringResource(R.string.settings_sessions_clear_old),
+            description = stringResource(R.string.settings_sessions_clear_old_note),
+            actionLabel = stringResource(R.string.settings_sessions_clear_old_action),
+            onAction = { showClearOld = true },
+        )
+        if (showClearOld) {
+            HDialog(
+                title = stringResource(R.string.settings_sessions_clear_old_title),
+                text = {
+                    Text(
+                        stringResource(R.string.settings_sessions_clear_old_text),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary,
+                    )
+                },
+                onDismiss = { showClearOld = false },
+                confirmLabel = stringResource(R.string.settings_sessions_clear_old_action),
+                onConfirm = {
+                    showClearOld = false
+                    viewModel.clearOldSessions()
+                },
+                confirmEnabled = true,
+                dismissLabel = stringResource(R.string.action_cancel),
+            )
+        }
         HSectionTitle(stringResource(R.string.settings_sessions_storage))
+        if (usage == null) {
+            Text(
+                stringResource(R.string.settings_sessions_storage_loading),
+                style = MaterialTheme.typography.bodySmall,
+                color = HarnessTheme.textTertiary,
+            )
+        }
         usage?.let { u ->
             SettingsInfoRow(
                 title = stringResource(R.string.settings_storage_env),
@@ -339,8 +410,11 @@ private fun formatBytes(bytes: Long): String = when {
 fun EnvironmentSection(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
+    packagesViewModel: dev.harness.PackagesViewModel,
 ) {
     var showReinstallConfirm by rememberSaveable { mutableStateOf(false) }
+    var showUpdatePiConfirm by rememberSaveable { mutableStateOf(false) }
+    var updatePiResult by remember { mutableStateOf<String?>(null) }
     val colors = HarnessTheme
     Column(
         Modifier
@@ -358,6 +432,15 @@ fun EnvironmentSection(
             title = stringResource(R.string.settings_env_connection),
             value = connectionLabel(uiState.connection),
         )
+        HSectionTitle(stringResource(R.string.settings_env_update))
+        HButton(
+            text = stringResource(R.string.settings_env_update_action),
+            onClick = { showUpdatePiConfirm = true },
+            variant = HButtonDefaults.Variant.Secondary,
+        )
+        updatePiResult?.let {
+            dev.harness.ui.components.HCodeBlock(code = it, language = "log")
+        }
         HSectionTitle(stringResource(R.string.settings_section_storage))
         SettingsDangerRow(
             title = stringResource(R.string.settings_reinstall_env),
@@ -366,6 +449,41 @@ fun EnvironmentSection(
             onAction = { showReinstallConfirm = true },
         )
         Spacer(Modifier.height(Space.xl))
+    }
+    if (showUpdatePiConfirm) {
+        HDialog(
+            title = stringResource(R.string.settings_env_update_confirm_title),
+            text = {
+                Text(
+                    stringResource(R.string.settings_env_update_confirm_text),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textSecondary,
+                )
+            },
+            onDismiss = { showUpdatePiConfirm = false },
+            confirmLabel = stringResource(R.string.settings_env_update_action),
+            onConfirm = {
+                showUpdatePiConfirm = false
+                if (uiState.chat.isBusy) {
+                    viewModel.showNotice(
+                        stringResource(R.string.settings_env_update_busy),
+                        dev.harness.core.state.NoticeLevel.Warning,
+                    )
+                } else {
+                    packagesViewModel.updateSelf(onDone = {
+                        val log = packagesViewModel.uiState.value.operation?.log.orEmpty()
+                        updatePiResult = log.joinToString("\n").ifBlank { null }
+                        val ok = packagesViewModel.uiState.value.operation?.exitCode == 0
+                        viewModel.showNotice(
+                            stringResource(if (ok) R.string.settings_env_update_done else R.string.settings_env_update_failed),
+                            if (ok) dev.harness.core.state.NoticeLevel.Info else dev.harness.core.state.NoticeLevel.Error,
+                        )
+                    })
+                }
+            },
+            confirmEnabled = true,
+            dismissLabel = stringResource(R.string.action_cancel),
+        )
     }
     if (showReinstallConfirm) {
         HDialog(

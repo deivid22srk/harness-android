@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -118,7 +119,8 @@ class SettingsRepository(context: Context) {
 
     private suspend fun loadWithMigration(): AppSettings = mutex.withLock {
         val stored = store.data.first()
-        if (stored.contains(KEY_MIGRATED)) {
+        val migratedVersion = stored[KEY_MIGRATED_VERSION] ?: 0
+        if (migratedVersion >= MIGRATION_VERSION) {
             return@withLock decodeSettings(stored)
         }
         // First run on the new storage: import the legacy SharedPreferences
@@ -129,6 +131,7 @@ class SettingsRepository(context: Context) {
             it.clear()
             writeSettings(it, imported)
             it[KEY_MIGRATED] = true
+            it[KEY_MIGRATED_VERSION] = MIGRATION_VERSION
         }
         // Clear the legacy file so stale values can never resurface. API keys
         // are in SecretStore, not here — nothing is lost.
@@ -193,6 +196,8 @@ class SettingsRepository(context: Context) {
             resumeLastSession = prefs[KEY_RESUME_SESSION] ?: true,
             onboardingDone = prefs[KEY_ONBOARDED] ?: false,
             batteryPromptShown = prefs[KEY_BATTERY_PROMPT] ?: false,
+            steeringMode = prefs[KEY_STEERING_MODE] ?: "one-at-a-time",
+            followUpMode = prefs[KEY_FOLLOW_UP_MODE] ?: "one-at-a-time",
             customProviders = prefs[KEY_CUSTOM_PROVIDERS]?.let { raw ->
                 runCatching { json.decodeFromString<List<CustomProvider>>(raw) }.getOrDefault(emptyList())
             }.orEmpty(),
@@ -210,6 +215,8 @@ class SettingsRepository(context: Context) {
         target[KEY_RESUME_SESSION] = value.resumeLastSession
         target[KEY_ONBOARDED] = value.onboardingDone
         target[KEY_BATTERY_PROMPT] = value.batteryPromptShown
+        target[KEY_STEERING_MODE] = value.steeringMode
+        target[KEY_FOLLOW_UP_MODE] = value.followUpMode
         target[KEY_CUSTOM_PROVIDERS] = json.encodeToString(value.customProviders)
         target[KEY_SELECTED_MODELS] = value.selectedModels.map { (k, v) -> "$k=${v.joinToString("\n")}" }.toSet()
     }
@@ -273,6 +280,14 @@ class SettingsRepository(context: Context) {
     var hapticFeedback: Boolean
         get() = snap.hapticFeedback
         set(v) = update { it.copy(hapticFeedback = v) }
+
+    var steeringMode: String
+        get() = snap.steeringMode
+        set(v) = update { it.copy(steeringMode = v) }
+
+    var followUpMode: String
+        get() = snap.followUpMode
+        set(v) = update { it.copy(followUpMode = v) }
 
     var onboardingDone: Boolean
         get() = snap.onboardingDone
@@ -355,6 +370,7 @@ class SettingsRepository(context: Context) {
 
     private companion object {
         const val LEGACY_PREFS = "harness_settings"
+        const val MIGRATION_VERSION = 1
 
         val KEY_MIGRATED = booleanPreferencesKey("migrated_from_prefs")
         val KEY_PROVIDER = stringPreferencesKey("provider")
@@ -368,6 +384,9 @@ class SettingsRepository(context: Context) {
         val KEY_BATTERY_PROMPT = booleanPreferencesKey("battery_prompt_shown")
         val KEY_CUSTOM_PROVIDERS = stringPreferencesKey("custom_providers_json")
         val KEY_SELECTED_MODELS = stringSetPreferencesKey("selected_models")
+        val KEY_MIGRATED_VERSION = intPreferencesKey("migrated_version")
+        val KEY_STEERING_MODE = stringPreferencesKey("steering_mode")
+        val KEY_FOLLOW_UP_MODE = stringPreferencesKey("follow_up_mode")
 
 }
 }

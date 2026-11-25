@@ -262,7 +262,10 @@ fun SettingsSliderRow(
             value = value,
             onValueChange = onValueChange,
             steps = steps,
-            modifier = Modifier.fillMaxWidth().padding(top = Space.xs),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = Space.xs)
+                .semantics { contentDescription = "$title: $valueLabel" },
             colors = SliderDefaults.colors(
                 thumbColor = colors.accentButton,
                 activeTrackColor = colors.accentButton,

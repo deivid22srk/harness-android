@@ -100,6 +100,8 @@ data class HarnessUiState(
     val renderMarkdown: Boolean = true,
     val sendOnEnter: Boolean = false,
     val hapticFeedback: Boolean = true,
+    val steeringMode: String = "one-at-a-time",
+    val followUpMode: String = "one-at-a-time",
     // Settings hub navigation (null = hub) + search
     val settingsSection: SettingsSection? = null,
     val settingsSearch: String = "",
@@ -155,6 +157,8 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             renderMarkdown = settings.renderMarkdown,
             sendOnEnter = settings.sendOnEnter,
             hapticFeedback = settings.hapticFeedback,
+            steeringMode = settings.steeringMode,
+            followUpMode = settings.followUpMode,
         )
 
         viewModelScope.launch {
@@ -223,6 +227,27 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
 
     private fun setNotice(notice: UiNotice?) {
         _ui.value = _ui.value.copy(notice = notice)
+    }
+
+    /** Public one-shot notice for flows without a dedicated screen state. */
+    fun showNotice(text: String, level: NoticeLevel = NoticeLevel.Info) {
+        setNotice(UiNotice(text, level))
+    }
+
+    /** "Limpar sessões antigas": mantém as 10 mais recentes do projeto ativo. */
+    fun clearOldSessions(keep: Int = 10) {
+        val project = _ui.value.activeProject ?: return
+        val activeFile = _ui.value.chat.sessionFile?.let {
+            runCatching { sessionRepo.guestToHostPath(it) }.getOrNull()
+        }
+        viewModelScope.launch {
+            val deleted = runCatching {
+                sessionRepo.deleteOldSessions(project, keep, activeFile)
+            }.getOrDefault(0)
+            showNotice(
+                appContext.getString(if (deleted > 0) R.string.sessions_cleared else R.string.sessions_cleared_none, deleted),
+            )
+        }
     }
 
     fun dismissNotice() {
@@ -373,6 +398,12 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
      * target is the persisted active-session marker, falling back to the
      * newest session file in the project's deterministic session directory.
      */
+    /** Pushes the queue-delivery preferences right after a handshake. */
+    private suspend fun applyQueueModes() {
+        container.session.setSteeringMode(_ui.value.steeringMode)
+        container.session.setFollowUpMode(_ui.value.followUpMode)
+    }
+
     private fun startPiAndResume(project: Project) {
         AgentService.start(appContext)
         viewModelScope.launch {
@@ -384,6 +415,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             lastPersistedSessionFile = null
             val started = container.session.start(config)
             if (!started) return@launch
+            applyQueueModes()
             val resumeHost = withContext(Dispatchers.IO) {
                 runCatching {
                     sessionRepo.lastSessionFileFor(project) ?: sessionRepo.newestSessionFile(project)
@@ -435,6 +467,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
                 AgentService.start(appContext)
                 val started = container.session.start(config)
                 if (!started) return@launch
+                applyQueueModes()
             }
             val guest = sessionRepo.hostToGuestPath(summary.file)
             val alreadyActive = _ui.value.chat.sessionFile == guest
@@ -460,7 +493,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             )
             activeLaunch = config
             lastPersistedSessionFile = null
-            container.session.start(config)
+            if (container.session.start(config)) applyQueueModes()
         }
     }
 
@@ -496,6 +529,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
                 AgentService.start(appContext)
                 val started = container.session.start(config)
                 if (!started) return@launch
+                applyQueueModes()
             }
             val guest = sessionRepo.hostToGuestPath(summary.file)
             val alreadyActive = _ui.value.chat.sessionFile == guest
@@ -771,12 +805,37 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         _ui.value = _ui.value.copy(hapticFeedback = enabled)
     }
 
+    /** Applies the queue delivery modes to the RUNNING agent when changed. */
+    fun setSteeringMode(mode: String) {
+        container.settings.steeringMode = mode
+        _ui.value = _ui.value.copy(steeringMode = mode)
+        if (_ui.value.connection == ConnectionState.Connected) {
+            viewModelScope.launch { container.session.setSteeringMode(mode) }
+        }
+    }
+
+    fun setFollowUpMode(mode: String) {
+        container.settings.followUpMode = mode
+        _ui.value = _ui.value.copy(followUpMode = mode)
+        if (_ui.value.connection == ConnectionState.Connected) {
+            viewModelScope.launch { container.session.setFollowUpMode(mode) }
+        }
+    }
+
     fun setResumeLastSession(enabled: Boolean) {
         container.settings.resumeLastSession = enabled
     }
 
     /** Current resume preference (hub subtitle). */
     fun resumeLastSessionEnabled(): Boolean = container.settings.resumeLastSession
+
+    /** Total declared packages (global + project) for the hub subtitle. */
+    suspend fun installedPackagesCount(): Int = withContext(Dispatchers.IO) {
+        runCatching {
+            dev.harness.core.pi.PiPackageManager(container.paths, container.proot)
+                .listInstalled(null).size
+        }.getOrDefault(0)
+    }
 
     /** Storage report for the "Projetos e sessões" settings screen. */
     data class StorageUsage(val rootfsBytes: Long, val sessionsBytes: Long, val projectsBytes: Long) {

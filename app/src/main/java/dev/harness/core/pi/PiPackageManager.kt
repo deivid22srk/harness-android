@@ -264,6 +264,15 @@ class PiPackageManager(
         runPi(argv, projectGuestPath)
     }
 
+    /**
+     * Updates the Pi itself (`pi update`). ONLY callable from the Ambiente
+     * screen with explicit confirmation — never used for package updates
+     * (those use `update` above with --extensions / a source).
+     */
+    fun updateSelf(): Flow<String> = mutate(PackageOperation.OpKind.UPDATE, "pi (self)") {
+        runPi(listOf("pi", "update"), null)
+    }
+
     private fun runPi(argv: List<String>, projectGuestPath: String?): ProcessRunner.Result {
         // The project cwd matters for `-l` (pi writes .pi/settings.json there).
         val guestCwd = projectGuestPath ?: "/root"

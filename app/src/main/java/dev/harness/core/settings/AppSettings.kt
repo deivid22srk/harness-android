@@ -37,6 +37,9 @@ data class AppSettings(
     val renderMarkdown: Boolean = true,
     val sendOnEnter: Boolean = false,
     val hapticFeedback: Boolean = true,
+    /** Queue delivery modes (rpc-commands.md): "all" | "one-at-a-time". */
+    val steeringMode: String = "one-at-a-time",
+    val followUpMode: String = "one-at-a-time",
     // Projects & sessions
     val resumeLastSession: Boolean = true,
     // Onboarding / one-shot prompts
