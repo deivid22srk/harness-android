@@ -1,6 +1,8 @@
 package dev.harness.ui.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +65,7 @@ import dev.harness.ui.components.settings.SettingsInfoRow
 import dev.harness.ui.components.settings.SettingsSliderRow
 import dev.harness.ui.components.settings.SettingsSwitchRow
 import dev.harness.ui.components.touchTargetClickable
+import dev.harness.ui.screens.thinkingLabel
 import dev.harness.ui.theme.HarnessTheme
 import dev.harness.ui.theme.MonoStyle
 import dev.harness.ui.theme.Radii
@@ -674,16 +677,6 @@ internal fun appVersionName(): String {
     } ?: "—"
 }
 
-@Composable
-internal fun thinkingLabel(level: String): String = stringResource(
-    when (level) {
-        "off" -> R.string.thinking_off
-        "low" -> R.string.thinking_low
-        "high" -> R.string.thinking_high
-        else -> R.string.thinking_medium
-    },
-)
-
 /** "Obter modelos" dialog. */
 @Composable
 internal fun ModelsDialog(
@@ -792,7 +785,7 @@ private fun ModelRow(option: dev.harness.ModelOption, onToggle: () -> Unit) {
         ) {
             if (option.selected) {
                 androidx.compose.material3.Icon(
-                    androidx.compose.material.icons.Icons.Default.Check,
+                    Icons.Default.Check,
                     contentDescription = null,
                     tint = colors.background,
                     modifier = Modifier.size(14.dp),
