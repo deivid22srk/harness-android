@@ -118,7 +118,10 @@ fun ChatScreen(
 
         val sessionError = uiState.chat.error
         if (sessionError != null || uiState.connection == ConnectionState.Failed) {
-            ConnectionErrorBanner(onRetry = viewModel::restartSession)
+            ConnectionErrorBanner(
+                message = sessionError ?: stringResource(R.string.chat_session_error_title),
+                onRetry = viewModel::restartSession,
+            )
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -138,6 +141,7 @@ fun ChatScreen(
             draftKey = uiState.activeProject?.hostPath ?: "draft",
             queueSize = uiState.chat.steeringQueue.size + uiState.chat.followUpQueue.size,
             onSend = viewModel::send,
+            onQueue = viewModel::steer,
             onStop = viewModel::stopAgent,
             onOpenModelPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Model, true) },
             onOpenThinkingPicker = { viewModel.setPicker(HarnessViewModel.Pickers.Thinking, true) },
@@ -277,7 +281,7 @@ private fun connectionColor(state: ConnectionState) = when (state) {
 }
 
 @Composable
-private fun ConnectionErrorBanner(onRetry: () -> Unit) {
+private fun ConnectionErrorBanner(message: String, onRetry: () -> Unit) {
     val colors = HarnessTheme
     Row(
         Modifier
@@ -296,7 +300,7 @@ private fun ConnectionErrorBanner(onRetry: () -> Unit) {
             modifier = Modifier.size(18.dp),
         )
         Text(
-            stringResource(R.string.chat_session_error_title),
+            message,
             style = MaterialTheme.typography.bodyMedium,
             color = colors.toolErrorText,
             modifier = Modifier.weight(1f),

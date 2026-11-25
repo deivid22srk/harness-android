@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.harness.ui.theme.HarnessTheme
@@ -87,7 +89,7 @@ fun HProgressSteps(
     }
 }
 
-/** Determinate progress bar with animated fraction. */
+/** Determinate progress bar with animated fraction and progress semantics. */
 @Composable
 fun HProgressBar(
     progress: Float,
@@ -105,7 +107,10 @@ fun HProgressBar(
             .fillMaxWidth()
             .height(6.dp)
             .clip(Radii.shapePill)
-            .background(colors.surfaceHigh),
+            .background(colors.surfaceHigh)
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(animated, 0f..1f)
+            },
     ) {
         Box(
             Modifier

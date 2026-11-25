@@ -63,6 +63,15 @@
     <string name="composer_attach">Attach image</string>
     <string name="composer_model_chip">Model</string>
     <string name="composer_thinking_chip">Reasoning</string>
+    <string name="composer_queue">Queue</string>
+    <string name="tool_label_shell">Shell</string>
+    <string name="tool_label_read">Read</string>
+    <string name="tool_label_write">Write</string>
+    <string name="tool_label_edit">Edit</string>
+    <string name="tool_label_search">Search</string>
+    <string name="tool_label_list">List</string>
+    <string name="tool_label_web">Web</string>
+    <string name="tool_label_tasks">Tasks</string>
     <string name="thinking_chip_off">Reasoning off</string>
     <string name="thinking_chip_minimal">Reasoning minimal</string>
     <string name="thinking_chip_low">Reasoning low</string>

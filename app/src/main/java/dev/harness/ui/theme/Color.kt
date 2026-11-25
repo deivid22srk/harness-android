@@ -18,7 +18,7 @@ val DarkOutline = Color(0xFF2A3040)
 val DarkOutlineStrong = Color(0xFF3A4156)
 val DarkTextPrimary = Color(0xFFE8EBF3)
 val DarkTextSecondary = Color(0xFF9AA3B8)
-val DarkTextTertiary = Color(0xFF6B7488)
+val DarkTextTertiary = Color(0xFF818CA3) // metadata text — 5.72:1 on bg, AA ok
 val DarkPrimary = Color(0xFF7C5CFF)
 val DarkPrimaryButton = Color(0xFF6841E0) // white label on this = 6.14:1
 val DarkOnPrimary = Color(0xFFFFFFFF)
@@ -50,7 +50,7 @@ val LightOutline = Color(0xFFD5D9E4)
 val LightOutlineStrong = Color(0xFFB8BECF)
 val LightTextPrimary = Color(0xFF0F1320)
 val LightTextSecondary = Color(0xFF5A6378)
-val LightTextTertiary = Color(0xFF8189A0)
+val LightTextTertiary = Color(0xFF646D82) // metadata text — 4.88:1 on bg, AA ok
 val LightPrimary = Color(0xFF5B3FE0)
 val LightPrimaryButton = Color(0xFF5B3FE0) // white label on this = 6.50:1
 val LightOnPrimary = Color(0xFFFFFFFF)

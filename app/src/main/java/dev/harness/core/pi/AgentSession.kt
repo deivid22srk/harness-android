@@ -93,14 +93,14 @@ class AgentSession(
         stopInternal()
         if (!paths.hasProotBinaries) {
             connectionFlow.value = ConnectionState.Failed
-            publish(ChatState(error = "Binários do ambiente ausentes no APK."))
+            publish(internal.copy(error = "Binários do ambiente ausentes no APK."))
             return false
         }
         val process = try {
             PiProcess(paths, proot).also { it.start(launch) }
         } catch (t: Throwable) {
             connectionFlow.value = ConnectionState.Failed
-            publish(ChatState(error = "Não foi possível iniciar o agente: ${t.message}"))
+            publish(internal.copy(error = "Não foi possível iniciar o agente: ${t.message}"))
             return false
         }
         pi = process
@@ -108,7 +108,7 @@ class AgentSession(
 
         val osProcess = process.process ?: run {
             connectionFlow.value = ConnectionState.Failed
-            publish(ChatState(error = "O processo do agente não iniciou."))
+            publish(internal.copy(error = "O processo do agente não iniciou."))
             return false
         }
         val client = RpcClient(
@@ -130,7 +130,7 @@ class AgentSession(
         val stateResp = client.call(cmd("get_state"), timeoutMs = 15_000)
             ?: run {
                 connectionFlow.value = ConnectionState.Failed
-                publish(ChatState(error = "O agente não respondeu ao handshake (get_state)."))
+                publish(internal.copy(error = "O agente não respondeu ao handshake (get_state)."))
                 stopInternal()
                 return false
             }
@@ -141,6 +141,7 @@ class AgentSession(
 
         watchProcess(process)
         restartAttempts.set(0)
+        publish(internal.copy(error = null))
         connectionFlow.value = ConnectionState.Connected
         return true
     }
@@ -175,13 +176,32 @@ class AgentSession(
             imageJson?.let { put("images", it) }
             if (busy) put("streamingBehavior", "followUp")
         }
-        rpc?.call(command, timeoutMs = 20_000)
+        val client = rpc ?: run {
+            _notices.tryEmit(SessionNotice("O agente não está em execução. Reabra o projeto para iniciá-lo.", NoticeLevel.Error))
+            return
+        }
+        val response = client.call(command, timeoutMs = 20_000)
+        when {
+            response == null -> _notices.tryEmit(
+                SessionNotice("A mensagem não foi confirmada pelo agente (timeout). Verifique a conexão.", NoticeLevel.Error),
+            )
+            !response.success -> _notices.tryEmit(
+                SessionNotice(response.error ?: "Falha ao enviar a mensagem.", NoticeLevel.Error),
+            )
+        }
     }
 
     suspend fun steer(text: String) {
         if (text.isBlank()) return
+        val client = rpc ?: run {
+            _notices.tryEmit(SessionNotice("O agente não está em execução.", NoticeLevel.Error))
+            return
+        }
         appendUserLocally(text, 0)
-        rpc?.call(buildJsonObject { put("type", "steer"); put("message", text) })
+        val response = client.call(buildJsonObject { put("type", "steer"); put("message", text) })
+        if (response != null && !response.success) {
+            _notices.tryEmit(SessionNotice(response.error ?: "Falha ao enfileirar a mensagem.", NoticeLevel.Error))
+        }
     }
 
     suspend fun followUp(text: String) {
@@ -426,7 +446,7 @@ class AgentSession(
                         NoticeLevel.Error,
                     ),
                 )
-                publish(ChatState(error = "O agente não pôde ser mantido em execução."))
+                publish(internal.copy(error = "O agente não pôde ser mantido em execução."))
                 return@launch
             }
             val backoff = RESTART_BASE_MS shl (attempt - 1)

@@ -95,11 +95,7 @@ private fun OnboardingProgress(state: ProvisionState) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = if (state is ProvisionState.Idle) {
-                stringResource(R.string.onboarding_starting)
-            } else {
-                state.label
-            },
+            text = provisionStatusLabel(state),
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textPrimary,
         )
@@ -124,6 +120,21 @@ private fun OnboardingProgress(state: ProvisionState) {
         textAlign = TextAlign.Center,
     )
 }
+
+/** Localized phase label — core's ProvisionState.label stays untranslated. */
+@Composable
+private fun provisionStatusLabel(state: ProvisionState): String = stringResource(
+    when (state) {
+        is ProvisionState.Idle -> R.string.onboarding_starting
+        is ProvisionState.Preparing -> R.string.onboarding_step_check
+        is ProvisionState.Downloading -> R.string.onboarding_step_download
+        is ProvisionState.Extracting, is ProvisionState.Configuring -> R.string.onboarding_step_extract
+        is ProvisionState.InstallingPackages -> R.string.onboarding_step_packages
+        is ProvisionState.InstallingAgent -> R.string.onboarding_step_agent
+        is ProvisionState.Ready -> R.string.onboarding_step_agent
+        is ProvisionState.Failed -> R.string.onboarding_error_title
+    },
+)
 
 /** Rough ETA heuristics per phase (seconds, calibrated for ~4 MB + apk/npm). */
 private fun ProvisionState.etaText(): String? = when (this) {

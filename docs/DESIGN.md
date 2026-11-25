@@ -24,7 +24,7 @@ usado em contêineres/foco; o botão preenchido usa `accentButton` (#6841E0,
 | `border` / `borderStrong` | `#2A3040` / `#3A4156` | `#D5D9E4` / `#B8BECF` | hairlines (decorativas; estados não dependem só de borda) |
 | `textPrimary` | `#E8EBF3` | `#0F1320` | corpo (16,2:1 / 17,4:1) |
 | `textSecondary` | `#9AA3B8` | `#5A6378` | apoio (7,6:1 / 5,7:1) |
-| `textTertiary` | `#6B7488` | `#8189A0` | metadados discretos |
+| `textTertiary` | `#818CA3` | `#646D82` | metadados discretos (5,7:1 / 4,9:1 — AA após revisão do Crítico) |
 | `accentButton` | `#6841E0` | `#5B3FE0` | botão primário |
 | `accent` | `#7C5CFF` | `#5B3FE0` | foco, barras de progresso |
 | `accentText` | `#A18BFF` | `#5B3FE0` | acento como texto |

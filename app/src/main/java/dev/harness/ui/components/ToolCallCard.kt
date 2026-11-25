@@ -76,7 +76,8 @@ fun ToolCallCard(
             ToolStatus.Cancelled -> R.string.tool_status_cancelled
         },
     )
-    val rowDescription = "${tool.label}. $statusLabel. " +
+    val label = localizedToolLabel(tool)
+    val rowDescription = "$label. $statusLabel. " +
         tool.summary.lineSequence().firstOrNull().orEmpty().take(120) +
         (tool.durationMs?.let { ". ${formatDuration(it)}" } ?: "")
 
@@ -103,7 +104,7 @@ fun ToolCallCard(
             Column(Modifier.weight(1f)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        tool.label,
+                        label,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = colors.textPrimary,
@@ -204,6 +205,23 @@ private fun toolStatusColor(status: ToolStatus): Color = when (status) {
     ToolStatus.Ok -> HarnessTheme.toolOk
     ToolStatus.Error -> HarnessTheme.toolError
     ToolStatus.Cancelled -> HarnessTheme.textTertiary
+}
+
+/** Localized tool label (core returns language-neutral names). */
+@Composable
+private fun localizedToolLabel(tool: ToolItem): String {
+    val res = when (tool.name.lowercase()) {
+        "bash" -> R.string.tool_label_shell
+        "read" -> R.string.tool_label_read
+        "write" -> R.string.tool_label_write
+        "edit" -> R.string.tool_label_edit
+        "glob", "grep" -> R.string.tool_label_search
+        "ls" -> R.string.tool_label_list
+        "webfetch", "fetch" -> R.string.tool_label_web
+        "todo" -> R.string.tool_label_tasks
+        else -> null
+    }
+    return res?.let { stringResource(it) } ?: tool.label
 }
 
 /** Readable diff: path header + colored added/removed/context lines. */

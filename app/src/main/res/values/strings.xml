@@ -70,6 +70,15 @@
     <string name="composer_attach">Anexar imagem</string>
     <string name="composer_model_chip">Modelo</string>
     <string name="composer_thinking_chip">Raciocínio</string>
+    <string name="composer_queue">Enfileirar</string>
+    <string name="tool_label_shell">Shell</string>
+    <string name="tool_label_read">Leitura</string>
+    <string name="tool_label_write">Escrita</string>
+    <string name="tool_label_edit">Edição</string>
+    <string name="tool_label_search">Busca</string>
+    <string name="tool_label_list">Listagem</string>
+    <string name="tool_label_web">Web</string>
+    <string name="tool_label_tasks">Tarefas</string>
     <string name="thinking_chip_off">Raciocínio off</string>
     <string name="thinking_chip_minimal">Raciocínio mínimo</string>
     <string name="thinking_chip_low">Raciocínio baixo</string>

@@ -68,6 +68,7 @@ fun Composer(
     draftKey: String,
     queueSize: Int,
     onSend: (String) -> Unit,
+    onQueue: (String) -> Unit,
     onStop: () -> Unit,
     onOpenModelPicker: () -> Unit,
     onOpenThinkingPicker: () -> Unit,
@@ -76,7 +77,8 @@ fun Composer(
     modifier: Modifier = Modifier,
 ) {
     val colors = HarnessTheme
-    var text by rememberSaveable(key = draftKey) { mutableStateOf("") }
+    // Draft is keyed per project: changing project resets (and restores its own).
+    var text by rememberSaveable(draftKey, key = "composer_draft") { mutableStateOf("") }
 
     val busy = state.isBusy
     val canSend = text.isNotBlank()
@@ -209,42 +211,72 @@ fun Composer(
                 )
             }
 
-            Box(
-                Modifier
-                    .size(48.dp)
-                    .touchTargetClickable(
-                        enabled = busy || canSend,
-                        role = androidx.compose.ui.semantics.Role.Button,
-                        shape = Radii.shapeMd,
+            // While busy: queue the message (steer) AND keep Stop reachable.
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalAlignment = Alignment.Bottom) {
+                if (busy) {
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .touchTargetClickable(
+                                enabled = canSend,
+                                role = androidx.compose.ui.semantics.Role.Button,
+                                shape = Radii.shapeMd,
+                            ) {
+                                val payload = text
+                                text = ""
+                                onQueue(payload)
+                            }
+                            .background(
+                                if (canSend) colors.accentButton else colors.surfaceElevated,
+                                Radii.shapeMd,
+                            ),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        if (busy) {
-                            onStop()
-                        } else {
-                            val payload = text
-                            text = ""
-                            onSend(payload)
-                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = stringResource(R.string.composer_queue),
+                            tint = if (canSend) colors.onAccent else colors.textTertiary,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
-                    .background(
-                        when {
-                            busy -> colors.toolErrorContainer
-                            canSend -> colors.accentButton
-                            else -> colors.surfaceElevated
+                }
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .touchTargetClickable(
+                            enabled = busy || canSend,
+                            role = androidx.compose.ui.semantics.Role.Button,
+                            shape = Radii.shapeMd,
+                        ) {
+                            if (busy) {
+                                onStop()
+                            } else {
+                                val payload = text
+                                text = ""
+                                onSend(payload)
+                            }
+                        }
+                        .background(
+                            when {
+                                busy -> colors.toolErrorContainer
+                                canSend -> colors.accentButton
+                                else -> colors.surfaceElevated
+                            },
+                            Radii.shapeMd,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (busy) Icons.Default.Close else Icons.AutoMirrored.Filled.Send,
+                        contentDescription = stringResource(if (busy) R.string.chat_stop else R.string.chat_send),
+                        tint = when {
+                            busy -> colors.toolErrorText
+                            canSend -> colors.onAccent
+                            else -> colors.textTertiary
                         },
-                        Radii.shapeMd,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (busy) Icons.Default.Close else Icons.AutoMirrored.Filled.Send,
-                    contentDescription = stringResource(if (busy) R.string.chat_stop else R.string.chat_send),
-                    tint = when {
-                        busy -> colors.toolErrorText
-                        canSend -> colors.onAccent
-                        else -> colors.textTertiary
-                    },
-                    modifier = Modifier.size(22.dp),
-                )
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
         }
     }

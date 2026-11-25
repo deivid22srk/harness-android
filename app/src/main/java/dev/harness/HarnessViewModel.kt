@@ -103,6 +103,9 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     /** Last prompt sent in the current session — powers "regenerar". */
     private var lastPrompt: String? = null
 
+    /** Images of the last prompt — regenerating must not lose attachments. */
+    private var lastImages: List<ImageAttachment> = emptyList()
+
     /** Pending project delete job (cancelled by "Desfazer"). */
     private var pendingDeleteJob: Job? = null
 
@@ -298,7 +301,14 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
     }
 
     fun openProject(project: Project) {
+        // Returning to the project that is already running must NOT relaunch
+        // the agent: just switch the screen and keep the live session.
+        val resuming = _ui.value.activeProject?.hostPath == project.hostPath &&
+            _ui.value.connection.let { it == ConnectionState.Connected || it == ConnectionState.Starting } &&
+            _ui.value.chat.items.isNotEmpty()
         _ui.value = _ui.value.copy(activeProject = project, screen = Screen.Chat)
+        if (resuming) return
+
         AgentService.start(appContext)
         viewModelScope.launch {
             val config = container.launchConfig().copy(
@@ -364,6 +374,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
             container.session.sendPrompt(text, images)
         }
         lastPrompt = text
+        lastImages = images
         _ui.value = _ui.value.copy(pendingImages = emptyList())
     }
 
@@ -375,11 +386,11 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         viewModelScope.launch { container.session.abort() }
     }
 
-    /** Re-sends the last user prompt (Regenerate). Only valid while idle. */
+    /** Re-sends the last user prompt with its attachments (Regenerate). */
     fun regenerate() {
         val prompt = lastPrompt ?: return
         if (_ui.value.chat.isBusy) return
-        viewModelScope.launch { container.session.sendPrompt(prompt) }
+        viewModelScope.launch { container.session.sendPrompt(prompt, lastImages) }
     }
 
     /** Last prompt for the UI to decide whether "Regenerar" is offered. */
@@ -390,6 +401,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         viewModelScope.launch {
             container.session.newSession()
             lastPrompt = null
+            lastImages = emptyList()
         }
         AgentService.stop(appContext)
     }

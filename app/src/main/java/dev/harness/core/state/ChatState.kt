@@ -102,17 +102,21 @@ data class ChatState(
 }
 
 internal object ToolLabels {
+    /**
+     * Language-neutral canonical names (localized at the UI layer via
+     * tool_label_* resources; see ToolCallCard).
+     */
     fun pretty(name: String): String = when (name.lowercase()) {
         "bash" -> "Shell"
-        "read" -> "Leitura"
-        "write" -> "Escrita"
-        "edit" -> "Edição"
-        "glob" -> "Busca"
-        "grep" -> "Busca"
-        "ls" -> "Listar"
+        "read" -> "Read"
+        "write" -> "Write"
+        "edit" -> "Edit"
+        "glob" -> "Search"
+        "grep" -> "Search"
+        "ls" -> "List"
         "webfetch" -> "Web"
         "fetch" -> "Web"
-        "todo" -> "Tarefas"
+        "todo" -> "Tasks"
         else -> name.replaceFirstChar { it.uppercase() }
     }
 }

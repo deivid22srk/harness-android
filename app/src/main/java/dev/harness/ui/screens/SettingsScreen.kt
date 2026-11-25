@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -534,7 +535,11 @@ private fun ModelRow(option: ModelOption, onToggle: () -> Unit) {
             .fillMaxWidth()
             .clip(Radii.shapeSm)
             .background(colors.surface)
-            .touchTargetClickable { onToggle() }
+            .toggleable(
+                value = option.selected,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() },
+            )
             .padding(horizontal = Space.md, vertical = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.md),
