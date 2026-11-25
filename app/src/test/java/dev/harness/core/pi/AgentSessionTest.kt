@@ -283,10 +283,15 @@ class AgentSessionTest {
         session.start(launchConfig(withKeys = true))
         awaitConnection(session, ConnectionState.Connected)
 
-        // Kill -9 equivalent: watchdog must notice and restart ( Connected
+        // Kill -9 equivalent: watchdog must notice and restart (Connected
         // again via a NEW fake process; the Restarting window is ~restartBaseMs
         // so we await the recovered state instead of the transient one).
         factory.created.peek()!!.destroy()
+        // The watchdog notices the death asynchronously — the state may still
+        // read Connected for a few ticks, so poll for the replacement process.
+        withTimeout(8000) {
+            while (factory.created.size < 2) delay(20)
+        }
         awaitConnection(session, ConnectionState.Connected, timeoutMs = 8000)
         assertTrue(factory.created.size >= 2)
         session.stop()
@@ -307,9 +312,17 @@ class AgentSessionTest {
         assertTrue(ok)
         awaitConnection(session, ConnectionState.Connected, timeoutMs = 8000)
 
-        val switchCommands = factory.created.drop(1)
-            .flatMap { it.commands }
-            .count { it.contains("\"switch_session\"") }
+        // The switch lands on the replacement process; the command is recorded
+        // by its reader thread, so poll briefly before asserting.
+        var switchCommands = 0
+        withTimeout(8000) {
+            while (switchCommands == 0) {
+                switchCommands = factory.created.drop(1)
+                    .flatMap { it.commands }
+                    .count { it.contains("\"switch_session\"") }
+                if (switchCommands == 0) delay(20)
+            }
+        }
         assertTrue("switch_session deve ser reemitido após o reinício", switchCommands >= 1)
         assertEquals(fileBefore, session.state.value.sessionFile)
         session.stop()

@@ -558,6 +558,11 @@ class AgentSession(
         scope.launch(Dispatchers.IO) {
             val exit = runCatching { osProcess.waitFor() }.getOrDefault(-1)
             if (connectionFlow.value == ConnectionState.Stopped) return@launch
+            // A replaced process (controlled stop inside start()/applyCredentials)
+            // also wakes waitFor. Only a spontaneous death of the CURRENT process
+            // may restart — otherwise the watchdog races the very restart that
+            // replaced it (double start, session resume lost — found by CI test).
+            if (pi !== process) return@launch
 
             // Bounded restart with exponential backoff: 2s, 4s, 8s. After
             // MAX_RESTARTS consecutive crashes we stop and surface the failure

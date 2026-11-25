@@ -98,6 +98,10 @@ android {
             // as system properties (visible inside the sandbox).
             it.systemProperty("harness.screenshots", System.getenv("HARNESS_SCREENSHOTS") ?: "0")
             it.systemProperty("harness.screenshots.dir", System.getenv("HARNESS_SCREENSHOTS_DIR") ?: "build/screenshots")
+            // Roborazzi only writes PNGs when its task type is Record, which is
+            // driven by this property (same mechanism the Roborazzi Gradle
+            // plugin uses for recordRoborazziDebug tasks).
+            it.systemProperty("roborazzi.test.record", System.getenv("HARNESS_SCREENSHOTS") ?: "false")
             // Full stack traces in the CI console so failures are diagnosable
             // without downloading test reports.
             it.testLogging {
