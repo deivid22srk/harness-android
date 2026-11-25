@@ -173,11 +173,30 @@ Protocolo implementado conforme a documentação oficial da versão instalada
 - Chaves de API cifradas com AES-256-GCM usando uma chave do **Android
   Keystore** (`SecretStore`). Nada em texto puro; `allowBackup=false` e as
   regras de extração excluem tudo.
+- O Keystore exige que o **IV seja gerado pelo provedor**
+  (`setRandomizedEncryptionRequired(true)`, o padrão). Passar um IV próprio
+  lança `InvalidAlgorithmParameterException: Caller-provided IV not permitted`
+  e derrubava o app; o `SecretStore` agora deixa o cifrador gerar o IV e o
+  armazena junto do texto cifrado.
 - As chaves são injetadas como variáveis de ambiente no processo do Pi
-  (`ANTHROPIC_API_KEY`, …), nunca persistidas em `~/.pi` pelo app.
+  (`ANTHROPIC_API_KEY`, …, ou `HARNESS_KEY_<ID>` para provedores
+  personalizados), nunca persistidas em `~/.pi` pelo app.
 - Nenhum segredo no repositório; o `.gitignore` exclui keystores.
 - O token `GITHUBK` é usado apenas localmente via `gh`, com `gh auth setup-git`
   (nunca em URL de remote).
+
+## 6.1 Provedores personalizados e seleção de modelos
+
+- **Provedores personalizados**: o usuário informa identificador, nome, base URL
+  e API. O `ModelCatalog` escreve `~/.pi/agent/models.json` com a chave via
+  `$ENV`, então o Pi alcança endpoints compatíveis (OpenAI/Anthropic/Google) sem
+  código de extensão. APIs suportadas: `openai-completions`, `openai-responses`,
+  `anthropic-messages`, `google-generative-ai`.
+- **Obter modelos**: o botão em Configurações chama `get_available_models` pelo
+  RPC (autoritativo para o Pi em execução) ou, sem sessão, `pi --list-models`.
+  O usuário marca/demarca modelos (com selecionar-tudo/limpar); a escolha é
+  persistida por provedor e passada ao Pi como `--models`, restringindo o
+  seletor de modelos do composer.
 
 ## 7. Desempenho
 
