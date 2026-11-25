@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Window background matches the Aurora dark theme (system dark = default). -->
     <style name="Theme.Harness" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/harness_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
