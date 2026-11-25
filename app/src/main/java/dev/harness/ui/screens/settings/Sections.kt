@@ -314,6 +314,7 @@ fun SessionsSection(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
 ) {
+    val colors = HarnessTheme
     var usage by remember { mutableStateOf<HarnessViewModel.StorageUsage?>(null) }
     var resume by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
@@ -464,18 +465,18 @@ fun EnvironmentSection(
             confirmLabel = stringResource(R.string.settings_env_update_action),
             onConfirm = {
                 showUpdatePiConfirm = false
+                val busyMsg = stringResource(R.string.settings_env_update_busy)
+                val doneMsg = stringResource(R.string.settings_env_update_done)
+                val failedMsg = stringResource(R.string.settings_env_update_failed)
                 if (uiState.chat.isBusy) {
-                    viewModel.showNotice(
-                        stringResource(R.string.settings_env_update_busy),
-                        dev.harness.core.state.NoticeLevel.Warning,
-                    )
+                    viewModel.showNotice(busyMsg, dev.harness.core.state.NoticeLevel.Warning)
                 } else {
                     packagesViewModel.updateSelf(onDone = {
                         val log = packagesViewModel.uiState.value.operation?.log.orEmpty()
                         updatePiResult = log.joinToString("\n").ifBlank { null }
                         val ok = packagesViewModel.uiState.value.operation?.exitCode == 0
                         viewModel.showNotice(
-                            stringResource(if (ok) R.string.settings_env_update_done else R.string.settings_env_update_failed),
+                            if (ok) doneMsg else failedMsg,
                             if (ok) dev.harness.core.state.NoticeLevel.Info else dev.harness.core.state.NoticeLevel.Error,
                         )
                     })

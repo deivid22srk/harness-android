@@ -28,7 +28,7 @@ data class PackageSearchState(
     val loading: Boolean = false,
     val error: String? = null,
     val hasMore: Boolean = false,
-    private val nextFrom: Int = 0,
+    val nextFrom: Int = 0,
 )
 
 /**
