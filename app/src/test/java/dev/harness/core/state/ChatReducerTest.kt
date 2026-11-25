@@ -98,7 +98,7 @@ class ChatReducerTest {
         }
         state = reducer.reduce(state, PiEvent.ToolExecutionStart("e1", "edit", args))
         val tool = (state.items.single() as ChatItem.ToolGroup).tools.single()
-        assertEquals("Edição", tool.label)
+        assertEquals("Edit", tool.label)  // ToolLabels agora é language-neutral; UI localiza via tool_label_*
         val diff = tool.diff!!
         assertEquals("src/Main.kt", diff.path)
         assertEquals(2, diff.added)
