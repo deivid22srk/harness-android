@@ -54,6 +54,10 @@ fun HarnessRoot(
         factory = SessionsViewModel.factory(viewModel.appForFactory()),
     )
     val sessionsState by sessionsViewModel.uiState.collectAsStateWithLifecycle()
+    val packagesViewModel: PackagesViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = PackagesViewModel.factory(viewModel.appForFactory()),
+    )
+    val packagesState by packagesViewModel.uiState.collectAsStateWithLifecycle()
 
     BackHandler(
         enabled = uiState.screen == Screen.Settings ||
@@ -87,6 +91,8 @@ fun HarnessRoot(
             Screen.Settings -> SettingsScreen(
                 uiState = uiState,
                 viewModel = viewModel,
+                packagesViewModel = packagesViewModel,
+                packagesState = packagesState,
                 onBack = viewModel::backToProjects,
                 wideScreen = wideScreen,
             )

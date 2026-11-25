@@ -517,6 +517,28 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         }
     }
 
+    /**
+     * "Reiniciar sessão agora" (Pacotes do Pi): restarts the Pi so newly
+     * installed/removed packages load, then RESUMES the exact same session
+     * file (Frente A) — the user keeps the full transcript (§5.3.5).
+     */
+    fun restartSessionAfterPackageChange() {
+        val project = _ui.value.activeProject ?: return
+        val config = activeLaunch ?: container.launchConfig().copy(
+            workDirGuest = project.guestPath,
+            sessionName = project.name,
+        )
+        activeLaunch = config
+        val resumeGuest = _ui.value.chat.sessionFile
+        viewModelScope.launch {
+            container.session.stop()
+            val started = container.session.start(config)
+            if (started && resumeGuest != null) {
+                container.session.switchToSession(resumeGuest)
+            }
+        }
+    }
+
     fun openSettings() {
         viewModelScope.launch {
             val diagnostics = withContext(Dispatchers.IO) { buildDiagnostics() }
@@ -532,10 +554,6 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
 
     /** Opens a specific settings category (hub row tap or deep link). */
     fun openSettingsSection(section: SettingsSection) {
-        if (section == SettingsSection.Packages) {
-            // Implemented in Rodada 3; the hub only offers it then.
-            return
-        }
         _ui.value = _ui.value.copy(
             screen = Screen.Settings,
             settingsSection = section,

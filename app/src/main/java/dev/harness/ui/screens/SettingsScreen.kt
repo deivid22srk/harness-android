@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +40,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.harness.HarnessUiState
 import dev.harness.HarnessViewModel
+import dev.harness.PackagesUiState
+import dev.harness.PackagesViewModel
 import dev.harness.SettingsSection
 import dev.harness.R
 import dev.harness.ui.components.HIconButton
@@ -75,6 +79,8 @@ private data class CategoryEntry(
 fun SettingsScreen(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
+    packagesViewModel: PackagesViewModel,
+    packagesState: PackagesUiState,
     onBack: () -> Unit,
     wideScreen: Boolean = false,
 ) {
@@ -108,7 +114,14 @@ fun SettingsScreen(
                     .padding(start = Space.md, end = Space.lg, top = Space.lg),
             ) {
                 HSectionTitle(sectionTitle(uiState.settingsSection))
-                SectionContent(uiState = uiState, viewModel = viewModel, section = uiState.settingsSection)
+                SectionContent(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    packagesViewModel = packagesViewModel,
+                    packagesState = packagesState,
+                    section = uiState.settingsSection,
+                    onBack = onBack,
+                )
             }
         }
     } else {
@@ -141,7 +154,14 @@ fun SettingsScreen(
                         )
                     }
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        SectionContent(uiState = uiState, viewModel = viewModel, section = uiState.settingsSection)
+                        SectionContent(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            packagesViewModel = packagesViewModel,
+                            packagesState = packagesState,
+                            section = uiState.settingsSection,
+                            onBack = onBack,
+                        )
                     }
                 }
             }
@@ -222,13 +242,23 @@ private fun HubList(
 private fun SectionContent(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
+    packagesViewModel: PackagesViewModel,
+    packagesState: PackagesUiState,
     section: SettingsSection?,
+    onBack: () -> Unit,
 ) {
     when (section) {
         SettingsSection.Account -> AccountSection(uiState, viewModel)
         SettingsSection.Appearance -> AppearanceSection(uiState, viewModel)
         SettingsSection.Chat -> ChatSection(uiState, viewModel)
         SettingsSection.Sessions -> SessionsSection(uiState, viewModel)
+        SettingsSection.Packages -> PackagesScreen(
+            packagesState = packagesState,
+            harnessState = uiState,
+            packagesViewModel = packagesViewModel,
+            harnessViewModel = viewModel,
+            onBack = viewModel::backToSettingsHub,
+        )
         SettingsSection.Environment -> EnvironmentSection(uiState, viewModel)
         SettingsSection.Privacy -> PrivacySection(uiState, viewModel)
         SettingsSection.Diagnostics -> DiagnosticsSection(uiState, viewModel)
@@ -291,6 +321,8 @@ private fun rememberSettingsEntries(
             R.string.settings_hub_resume_off
         },
     )
+    val packagesTitle = stringResource(R.string.settings_cat_packages)
+    val packagesSub = stringResource(R.string.settings_hub_packages_subtitle)
     val envTitle = stringResource(R.string.settings_cat_environment)
     val envSub = stringResource(R.string.settings_hub_environment_subtitle)
     val privacyTitle = stringResource(R.string.settings_cat_privacy)
@@ -306,6 +338,7 @@ private fun rememberSettingsEntries(
             CategoryEntry(SettingsSection.Appearance, Icons.Default.Palette, appearanceTitle, appearanceSub),
             CategoryEntry(SettingsSection.Chat, Icons.Default.Message, chatTitle, chatSub),
             CategoryEntry(SettingsSection.Sessions, Icons.Default.History, sessionsTitle, sessionsSub),
+            CategoryEntry(SettingsSection.Packages, Icons.Default.Extension, packagesTitle, packagesSub),
             CategoryEntry(SettingsSection.Environment, Icons.Default.Memory, envTitle, envSub),
             CategoryEntry(SettingsSection.Privacy, Icons.Default.Lock, privacyTitle, privacySub),
             CategoryEntry(SettingsSection.Diagnostics, Icons.Default.BugReport, diagTitle, diagSub),

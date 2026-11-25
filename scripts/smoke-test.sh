@@ -95,4 +95,35 @@ JSON
 
 node /scripts/session-persistence.js "$FIXTURE"
 
+# ---------------------------------------------------------------------------
+# Packages proof (Frente C): install a small pinned package, verify the
+# declaration lands in ~/.pi/agent/settings.json (the app's source of truth),
+# verify `pi list`, remove it and verify the declaration is gone.
+# Uses a PINNED version so the test is deterministic (PROMPT §5.4).
+# ---------------------------------------------------------------------------
+echo "==> Packages (pi install/list/remove)"
+PKG="npm:cc-safety-net@2.8.3"
+SETTINGS="$HOME/.pi/agent/settings.json"
+
+pi install "$PKG" >/dev/null 2>&1 || { echo "PACKAGES_FAILED: install"; exit 1; }
+node -e '
+const fs = require("fs");
+const s = JSON.parse(fs.readFileSync(process.env.HOME + "/.pi/agent/settings.json", "utf8"));
+const ok = Array.isArray(s.packages) && s.packages.some(p => String(p).startsWith("npm:cc-safety-net@2.8.3"));
+console.log("  install declared:", ok);
+process.exit(ok ? 0 : 1);
+' || { echo "PACKAGES_FAILED: settings.json"; exit 1; }
+pi list | grep -q "cc-safety-net" || { echo "PACKAGES_FAILED: pi list"; exit 1; }
+
+pi remove "npm:cc-safety-net" >/dev/null 2>&1 || { echo "PACKAGES_FAILED: remove"; exit 1; }
+node -e '
+const fs = require("fs");
+const s = JSON.parse(fs.readFileSync(process.env.HOME + "/.pi/agent/settings.json", "utf8"));
+const ok = Array.isArray(s.packages) && !s.packages.some(p => String(p).includes("cc-safety-net"));
+console.log("  remove declared:", ok);
+process.exit(ok ? 0 : 1);
+' || { echo "PACKAGES_FAILED: settings after remove"; exit 1; }
+
+echo "PACKAGES_OK"
+
 echo "==> Chain OK"

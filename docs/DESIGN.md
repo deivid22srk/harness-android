@@ -198,3 +198,34 @@ Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
 - **Robustez**: `Apagar dados` (Privacidade) e `Reinstalar ambiente`
   (Ambiente) com confirmação; diagnósticos com cópia e teste real do ambiente
   (node/pi versões via PRoot).
+
+## 11. Pacotes do Pi (frente C)
+
+- **Fonte da verdade**: `~/.pi/agent/settings.json` (global) e
+  `.pi/settings.json` (projeto, `-l`) — lidos direto do host (o rootfs é
+  acessível), nunca parse da saída frágil de `pi list`. O CLI roda **dentro do
+  PRoot** com `HOME=/root` e o `cwd` do projeto, então os arquivos são os
+  mesmos que o Pi usa.
+- **`PiPackageManager` (`core/pi/`)**: `listInstalled` (JSON declarado +
+  recursos do `package.json`/pastas convencionais), `install/remove` com
+  `Flow<String>` de saída ao vivo, `update(--extensions | <source>)` — **nunca
+  `pi update` pelado** (isso atualiza o próprio Pi). Um processo por vez
+  (mutex) com cancelamento real (`destroyForcibly`).
+- **Explorador**: busca no npm (`registry.npmjs.org/-/v1/search`,
+  `keywords:pi-package`, paginada) conforme o arquivo do usuário; cartões com
+  nome/versão/descrição/autor/downloads/data/tipo por keyword; toque preenche
+  a origem. Nota explícita de que os resultados vêm do npm e podem diferir da
+  galeria pi.dev.
+- **Segurança**: diálogo de confirmação OBRIGATÓRIO antes de instalar
+  ("executa código com as permissões do Pi"); bloqueio quando o agente está
+  gerando resposta; uma operação por vez.
+- **Tela** (`PackagesScreen`, dentro de Configurações → Pacotes do Pi):
+  seções Global/Do projeto, itens com ícone de origem (npm/git/local), versão
+  ou ref, selo "Fixado" e recursos; instalar com validação de formato +
+  exemplos tocáveis + escolha de escopo; log recolhível com "Cancelar" e
+  "Copiar diagnóstico"; erros com retry; pós-operação o banner oferece
+  **"Reiniciar sessão agora"** (`restartSessionAfterPackageChange` reinicia o
+  Pi e retoma a MESMA sessão — Frente A).
+- **Prova em CI**: smoke instala `npm:cc-safety-net@2.8.3` (fixado,
+  determinístico), valida o `settings.json` + `pi list`, remove e valida de
+  novo (`PACKAGES_OK`).
