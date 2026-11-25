@@ -173,18 +173,35 @@ if [ -f "$ASHMEM" ] && ! grep -q "include <string.h>" "$ASHMEM"; then
     sed -i 's|#include <stdlib.h>|#include <stdlib.h>\n#include <string.h>|' "$ASHMEM"
 fi
 
+# We ship the loader as a separate file and pass it via PROOT_LOADER, exactly
+# like Termux (PROOT_UNBUNDLE_LOADER). That skips the objcopy-based loader
+# wrapping (which needs to run the target's objcopy) and the 32-bit loader
+# (unused: the guest is always aarch64). Removing HAS_LOADER_32BIT from the
+# ARM64 branch keeps the build to a single static loader.
+ARCH="$WORK/proot/src/arch.h"
+sed -i '/#define HAS_LOADER_32BIT true/d' "$ARCH"
+
 cd "$WORK/proot/src"
 
-CFLAGS="-O2 -fPIC -DARG_MAX=131072 -I$WORK/sysroot/include"
-# -landroid-shmem resolves against the shared shim we bundle; talloc is static.
-LDFLAGS="-Wl,-z,noexecstack -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -Wl,-Bdynamic -landroid-shmem"
+# Pass flags through the environment, not as command-line overrides: the
+# GNUmakefile appends (-DPROOT_UNBUNDLE_LOADER, -DWITH_LIBANDROID_SHMEM, …) to
+# CFLAGS, and command-line variables would clobber those.
+export CFLAGS="-O2 -fPIC -DARG_MAX=131072 -I$WORK/sysroot/include"
+# talloc is linked statically; libandroid-shmem.so is a shared dependency.
+export LDFLAGS="-Wl,-z,noexecstack -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -Wl,-Bdynamic -landroid-shmem"
+
+MAKE_ARGS="CC=$CC LD=$CC AR=$AR STRIP=$STRIP \
+    OBJCOPY=$TOOLCHAIN/bin/llvm-objcopy OBJDUMP=$TOOLCHAIN/bin/llvm-objdump \
+    PROOT_WITH_LIBANDROID_SHMEM=true \
+    PROOT_UNBUNDLE_LOADER=/data/local/tmp/libproot-loader.so"
 
 echo "==> loader"
-make -j"$NPROC" loader/loader CC="$CC" LD="$CC" AR="$AR" STRIP="$STRIP" CFLAGS="$CFLAGS"
+# shellcheck disable=SC2086
+make -j"$NPROC" loader/loader $MAKE_ARGS
 
 echo "==> proot"
-make -j"$NPROC" proot CC="$CC" LD="$CC" AR="$AR" STRIP="$STRIP" \
-    CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" PROOT_WITH_LIBANDROID_SHMEM=true
+# shellcheck disable=SC2086
+make -j"$NPROC" proot $MAKE_ARGS
 
 "$STRIP" -s proot loader/loader
 install -m 0755 proot "$OUT/libproot.so"
