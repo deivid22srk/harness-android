@@ -270,3 +270,39 @@ Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
 
 - Contagens de resultados com `LiveRegionMode.Polite` na busca de sessões e no
   explorador de pacotes — TalkBack anuncia mudanças sem roubar o foco.
+
+## 15. v3 — Nova paleta neutra (referências do usuário)
+
+O pacote `fotos.zip` (docs/REFERENCIAS_VISUAIS.md) define uma identidade
+**carvão neutro + azul discreto**, substituindo o violeta "Aurora". Tokens
+atualizados em `ui/theme/Color.kt` (mesmos slots semânticos, nomes
+preservados; aliases `DarkPrimary*` mantidos para compatibilidade):
+
+| Token | Escuro (v3) | Claro (v3) | Origem |
+|---|---|---|---|
+| `background` | `#161616` | `#FAFAFA` | medido das refs |
+| `surface` | `#1C1C1E` | `#FFFFFF` | cards/menus |
+| `surfaceElevated` | `#222223` | `#F0F0F2` | pílula de input `#222222` |
+| `border` | `#2E2E30` | `#DCDCDF` | hairlines |
+| `textPrimary` | `#EDEDED` | `#1B1B1D` | corpo |
+| `textSecondary` | `#A0A0A3` | `#58585E` | apoio |
+| `textTertiary` | `#8A8A8F` | `#6B6B71` | metadados (AA pleno) |
+| `accent` | `#3D8BFF` | `#2E7CE6` | azul discreto (dots/ícones) |
+| `accentButton` | `#2773DB` | `#2773DB` | rótulo branco 4,6:1 |
+| `accentText` | `#6FB2FF` | `#1F66C4` | acento como texto pequeno |
+| `userBubble` | `#2E2E2E` | `#ECECEE` | bolha do usuário (medida) |
+| `codeBackground` | `#0D0D0D` | `#F1F1F3` | blocos quase pretos |
+| `toolOk` / `toolError` | `#4ADE80` / `#F26A6F` | `#0C8A4E` / `#C93940` | status |
+
+`scripts/contrast_check.py` atualizado com a nova paleta: **46 pares PASS AA,
+0 FAIL** (único AA-large intencional: ícone de erro grande 4,45:1 ≥ 3:1).
+Syntax colors do `HCodeBlock` permanecem pastel (lilás/verde-água/âmbar) —
+compatíveis com o carvão e medidos nas refs (visor de código).
+
+Regras visuais das referências aplicáveis a todas as telas a partir da
+Rodada 1: respostas do assistente full-width sem bolha; usuário em bolha
+`userBubble` (máx. 82%); divisores temporais com rótulo centralizado; cards
+com borda sutil sem sombra; pílulas cápsula; stop de streaming branco;
+menus com item destrutivo vermelho. Divergência consciente: "subagentes/
+shells" do app de referência não existe no protocolo RPC do Pi 1.6.0 e não
+será simulado (PROMPT §6.2 — não inventar comportamento).
