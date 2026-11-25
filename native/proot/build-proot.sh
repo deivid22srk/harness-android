@@ -24,7 +24,7 @@ set -eu
 PROOT_REPO="${PROOT_REPO:-https://github.com/termux/proot.git}"
 PROOT_REF="${PROOT_REF:-v5.1.107.102}"
 SHMEM_REF="${SHMEM_REF:-v0.7}"
-TALLOC_VERSION="${TALLOC_VERSION:-2.5.0}"
+TALLOC_VERSION="${TALLOC_VERSION:-2.4.2}"
 OUT="${OUT:-$(pwd)/out}"
 NPROC="${NPROC:-$(nproc 2>/dev/null || echo 2)}"
 
@@ -79,22 +79,28 @@ git clone --depth 1 --branch "$SHMEM_REF" https://github.com/termux/libandroid-s
 # 2. talloc (static) - PRoot's allocator. Built with Samba's waf in
 #    cross-compile mode (aarch64 objects cannot run on the runner).
 # ---------------------------------------------------------------------------
-echo "==> talloc $TALLOC_VERSION"
+echo "==> talloc"
 mkdir -p "$WORK/talloc"
 TALLOC_TARBALL="$WORK/talloc.tar.gz"
+# samba.org is intermittently unreachable from CI runners; try fast mirrors
+# first (Debian ships the pristine upstream tarball) and fall back gracefully.
 downloaded=0
 for url in \
+    "https://deb.debian.org/debian/pool/main/t/talloc/talloc_${TALLOC_VERSION}.orig.tar.gz" \
     "https://www.samba.org/ftp/talloc/talloc-${TALLOC_VERSION}.tar.gz" \
     "https://download.samba.org/pub/talloc/talloc-${TALLOC_VERSION}.tar.gz"; do
-    if curl -fsSL --retry 4 --retry-delay 5 --retry-all-errors --max-time 120 \
-        "$url" -o "$TALLOC_TARBALL" && [ -s "$TALLOC_TARBALL" ]; then
+    echo "  trying $url"
+    if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --connect-timeout 15 --max-time 90 \
+        "$url" -o "$TALLOC_TARBALL" && [ -s "$TALLOC_TARBALL" ] \
+        && tar tzf "$TALLOC_TARBALL" >/dev/null 2>&1; then
         downloaded=1
         break
     fi
+    rm -f "$TALLOC_TARBALL"
 done
-[ "$downloaded" = 1 ] || { echo "error: could not download talloc tarball" >&2; exit 1; }
-tar xzf "$TALLOC_TARBALL" -C "$WORK/talloc" --strip-components=1 \
-    || { echo "error: talloc tarball is not a valid archive" >&2; exit 1; }
+[ "$downloaded" = 1 ] || { echo "error: could not download a valid talloc tarball" >&2; exit 1; }
+tar xzf "$TALLOC_TARBALL" -C "$WORK/talloc" --strip-components=1
+test -f "$WORK/talloc/configure" || { echo "error: talloc tarball missing configure" >&2; exit 1; }
 cat > "$WORK/talloc/cross-answers.txt" <<'EOF'
 Checking uname sysname type: "Linux"
 Checking uname machine type: "dontcare"
