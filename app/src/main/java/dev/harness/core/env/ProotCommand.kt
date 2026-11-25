@@ -21,8 +21,9 @@ class ProotCommand(private val paths: HarnessPaths) {
         val env = HashMap<String, String>()
         env["PROOT_TMP_DIR"] = paths.tmp.absolutePath
         env["PROOT_LOADER"] = paths.prootLoader.absolutePath
-        // The PRoot binary is linked dynamically (Bionic libc + the bundled
-        // libandroid-shmem.so), so the loader must find them here.
+        // libproot.so is self-contained (talloc + ashmem shim are static) and
+        // only needs Bionic system libraries, but pointing the loader at
+        // nativeLibraryDir is harmless and helps if that ever changes.
         env["LD_LIBRARY_PATH"] = paths.nativeLibDir.absolutePath
         env.putAll(apiKeys)
         return env

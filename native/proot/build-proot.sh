@@ -10,13 +10,14 @@
 #   Termux PRoot fork (which carries the Android patches) with the NDK.
 #
 # Outputs (all placed in $OUT, copied into jniLibs/arm64-v8a/):
-#   libproot.so           - the PRoot binary
+#   libproot.so           - the PRoot binary (self-contained: Bionic system
+#                           libs only; talloc and the ashmem shim are linked
+#                           statically)
 #   libproot-loader.so    - PRoot's loader stub
-#   libandroid-shmem.so   - SysV shm↔ashmem shim (Android lacks SysV shm)
 #
-# talloc is linked *statically* into libproot.so, so no talloc library is
-# needed at runtime. Bionic's libc/liblog/libandroid are provided by the
-# platform. The app bundles the .so files above and sets LD_LIBRARY_PATH.
+# The loader is distributed separately and passed via PROOT_LOADER
+# (PROOT_UNBUNDLE_LOADER), because Android 10+ forbids exec() outside
+# applicationInfo.nativeLibraryDir.
 #
 # Requires: ANDROID_NDK_HOME (or ANDROID_NDK_ROOT) pointing at an NDK r25+.
 set -eu
@@ -59,20 +60,20 @@ mkdir -p "$WORK/hostbin"
 export PATH="$WORK/hostbin:$PATH"
 
 # ---------------------------------------------------------------------------
-# 1. libandroid-shmem.so - endian/ABI-correct SysV shared memory over ashmem.
+# 1. libandroid-shmem (static) - Android has no SysV shared memory; Termux
+#    PRoot links this shim that emulates it over ashmem.
 # ---------------------------------------------------------------------------
 echo "==> libandroid-shmem"
 git clone --depth 1 --branch "$SHMEM_REF" https://github.com/termux/libandroid-shmem.git "$WORK/shmem"
 (
     cd "$WORK/shmem"
     # Android's <paths.h> does not define _PATH_TMP; the shim needs it.
+    # Built as a static archive so libproot.so is self-contained.
     "$CC" -fPIC -O2 -D_PATH_TMP='"/tmp/"' -c shmem.c -o shmem.o
-    "$CC" -shared -Wl,--version-script=exports.txt -Wl,-soname,libandroid-shmem.so \
-        -o libandroid-shmem.so shmem.o -llog -landroid
+    "$AR" rcs libandroid-shmem.a shmem.o
     mkdir -p "$WORK/sysroot/include/sys"
     cp shm.h "$WORK/sysroot/include/sys/shm.h"
-    cp libandroid-shmem.so "$WORK/sysroot/lib/"
-    cp libandroid-shmem.so "$OUT/"
+    cp libandroid-shmem.a "$WORK/sysroot/lib/"
 )
 
 # ---------------------------------------------------------------------------
@@ -187,8 +188,12 @@ cd "$WORK/proot/src"
 # GNUmakefile appends (-DPROOT_UNBUNDLE_LOADER, -DWITH_LIBANDROID_SHMEM, …) to
 # CFLAGS, and command-line variables would clobber those.
 export CFLAGS="-O2 -fPIC -DARG_MAX=131072 -I$WORK/sysroot/include"
-# talloc is linked statically; libandroid-shmem.so is a shared dependency.
-export LDFLAGS="-Wl,-z,noexecstack -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -Wl,-Bdynamic -landroid-shmem"
+# Both talloc and the ashmem shim are linked statically so the resulting
+# libproot.so only needs Bionic system libraries (libc, libdl, liblog,
+# libandroid). This matters because Android does not reliably honor
+# LD_LIBRARY_PATH for app processes.
+export LDFLAGS="-Wl,-z,noexecstack -Wl,-z,origin -Wl,-rpath,\$ORIGIN \
+    -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -landroid-shmem -Wl,-Bdynamic -llog -landroid"
 
 MAKE_ARGS="CC=$CC LD=$CC AR=$AR STRIP=$STRIP \
     OBJCOPY=$TOOLCHAIN/bin/llvm-objcopy OBJDUMP=$TOOLCHAIN/bin/llvm-objdump \

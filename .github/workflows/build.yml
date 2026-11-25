@@ -64,7 +64,9 @@ jobs:
           ls -l native/proot/out
           test -s native/proot/out/libproot.so
           test -s native/proot/out/libproot-loader.so
-          test -s native/proot/out/libandroid-shmem.so
+          # libproot.so must be self-contained apart from Bionic system libs.
+          echo "Dynamic dependencies:"
+          readelf -d native/proot/out/libproot.so | grep NEEDED || true
 
       - name: Upload PRoot artifact
         uses: actions/upload-artifact@v4
