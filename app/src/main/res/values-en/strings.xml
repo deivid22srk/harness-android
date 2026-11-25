@@ -32,7 +32,7 @@
     <string name="chat_new_session">New session</string>
     <string name="chat_empty_title">Ready to go</string>
     <string name="chat_empty_desc">Ask the agent anything — it can read, edit and run code in this project.</string>
-    <string name="chat_suggestion_1">Explain this project's structure</string>
+    <string name="chat_suggestion_1">Explain the structure of this project</string>
     <string name="chat_suggestion_2">Find and fix a bug</string>
     <string name="chat_suggestion_3">Write tests for the main module</string>
     <string name="chat_jump_to_bottom">Jump to bottom</string>
