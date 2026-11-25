@@ -386,7 +386,7 @@ private fun connectionLabel(state: ConnectionState): String = stringResource(
 private fun connectionColor(state: ConnectionState) = when (state) {
     ConnectionState.Connected -> HarnessTheme.toolOk
     ConnectionState.Starting, ConnectionState.Restarting -> HarnessTheme.toolRunning
-    ConnectionState.NoProvider -> HarnessTheme.warning
+    ConnectionState.NoProvider -> HarnessTheme.toolWarning
     ConnectionState.Stopped -> HarnessTheme.textTertiary
     ConnectionState.Failed -> HarnessTheme.toolError
 }

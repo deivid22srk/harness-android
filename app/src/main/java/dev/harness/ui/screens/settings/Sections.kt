@@ -514,6 +514,7 @@ private fun connectionLabel(connection: dev.harness.core.pi.ConnectionState): St
     when (connection) {
         dev.harness.core.pi.ConnectionState.Connected -> R.string.conn_connected
         dev.harness.core.pi.ConnectionState.Starting -> R.string.conn_starting
+        dev.harness.core.pi.ConnectionState.NoProvider -> R.string.conn_no_provider
         dev.harness.core.pi.ConnectionState.Restarting -> R.string.conn_restarting
         dev.harness.core.pi.ConnectionState.Stopped -> R.string.conn_stopped
         dev.harness.core.pi.ConnectionState.Failed -> R.string.conn_failed
