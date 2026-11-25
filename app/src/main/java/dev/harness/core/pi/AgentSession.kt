@@ -36,7 +36,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 enum class ConnectionState { Stopped, Starting, Connected, Restarting, Failed }
 
@@ -76,7 +78,12 @@ class AgentSession(
     private var pumpJob: Job? = null
     private var hudJob: Job? = null
     private var stderrJob: Job? = null
-    private var stderrTail = ArrayDeque<String>()
+
+    /** Bounded stderr tail, safe to read from any thread ([stderrLog]). */
+    private val stderrTail = ConcurrentLinkedDeque<String>()
+
+    /** Consecutive crash-restart attempts (reset on a successful handshake). */
+    private val restartAttempts = AtomicInteger(0)
 
     private var config: PiLaunchConfig = PiLaunchConfig()
 
@@ -117,14 +124,23 @@ class AgentSession(
         client.start()
         startPublisher()
 
-        // Handshake: state, models, and existing messages.
+        // Handshake: state, models, and existing messages. All four commands
+        // must succeed before we report Connected — otherwise the UI would
+        // show a healthy session with empty state.
         val stateResp = client.call(cmd("get_state"), timeoutMs = 15_000)
+            ?: run {
+                connectionFlow.value = ConnectionState.Failed
+                publish(ChatState(error = "O agente não respondeu ao handshake (get_state)."))
+                stopInternal()
+                return false
+            }
         hydrateState(stateResp)
         client.call(cmd("get_available_models"))
         client.call(cmd("get_messages"))
         client.call(cmd("get_available_thinking_levels"))
 
         watchProcess(process)
+        restartAttempts.set(0)
         connectionFlow.value = ConnectionState.Connected
         return true
     }
@@ -384,7 +400,7 @@ class AgentSession(
                 osProcess.errorStream.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
                         stderrTail.addLast(line)
-                        if (stderrTail.size > 200) stderrTail.removeFirst()
+                        while (stderrTail.size > STDERR_TAIL_LINES) stderrTail.pollFirst()
                     }
                 }
             }
@@ -396,11 +412,32 @@ class AgentSession(
         scope.launch(Dispatchers.IO) {
             val exit = runCatching { osProcess.waitFor() }.getOrDefault(-1)
             if (connectionFlow.value == ConnectionState.Stopped) return@launch
+
+            // Bounded restart with exponential backoff: 2s, 4s, 8s. After
+            // MAX_RESTARTS consecutive crashes we stop and surface the failure
+            // instead of looping forever (a bad config would never recover).
+            val attempt = restartAttempts.incrementAndGet()
+            if (attempt > MAX_RESTARTS) {
+                connectionFlow.value = ConnectionState.Failed
+                _notices.tryEmit(
+                    SessionNotice(
+                        "O agente falhou $attempt vezes seguidas (último código $exit). " +
+                            "Verifique a configuração em Configurações → Diagnóstico.",
+                        NoticeLevel.Error,
+                    ),
+                )
+                publish(ChatState(error = "O agente não pôde ser mantido em execução."))
+                return@launch
+            }
+            val backoff = RESTART_BASE_MS shl (attempt - 1)
             connectionFlow.value = ConnectionState.Restarting
             _notices.tryEmit(
-                SessionNotice("O agente encerrou inesperadamente (código $exit). Reiniciando…", NoticeLevel.Warning),
+                SessionNotice(
+                    "O agente encerrou inesperadamente (código $exit). Tentando novamente…",
+                    NoticeLevel.Warning,
+                ),
             )
-            delay(1_500)
+            delay(backoff)
             start(config)
         }
     }
@@ -419,6 +456,9 @@ class AgentSession(
 
     private companion object {
         const val FRAME_MS = 33L
+        const val STDERR_TAIL_LINES = 200
+        const val MAX_RESTARTS = 3
+        const val RESTART_BASE_MS = 2_000L
     }
 }
 
