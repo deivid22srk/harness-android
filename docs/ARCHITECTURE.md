@@ -80,15 +80,30 @@ Por isso compilamos o **fork `termux/proot`** (que carrega os patches Android:
 `libandroid-shmem`, `ARG_MAX`, etc.) com o **NDK**, exatamente como o Termux faz.
 O script está em `native/proot/build-proot.sh`.
 
-Estado da validação local (Termux, using `clang` do Termux cujo alvo é
+Estado da validação local (Termux, usando o `clang` do Termux cujo alvo é
 `aarch64-unknown-linux-android24`, equivalente ao NDK):
 
 - `termux/proot` compilado localmente → `node -e 'console.log(…)'` = `NODE_OK v24.22.3`
 - o mesmo PRoot → `pi --version` = `1.6.0`
+- o esquema final (loader desacoplado via `PROOT_UNBUNDLE_LOADER`, `talloc`
+  estático, `libandroid-shmem.so` compartilhado) foi reproduzido no CI, que
+  publica `libproot.so` + `libproot-loader.so` + `libandroid-shmem.so`.
 
-O único passo não reproduzido no dispositivo foi o **link estático** —
-o Termux não possui libc estática — e é justamente o que o runner do CI
-(NDK completo) fará. Ver §8 (riscos).
+Ajustes que o build precisou (todos no `native/proot/build-proot.sh`):
+
+- **talloc**: baixado do espelho Debian (samba.org é instável nos runners),
+  compilado via waf em modo cross, arquivado como `libtalloc.a` e linkado
+  estaticamente (`-Wl,-Bstatic -ltalloc`).
+- **libandroid-shmem**: header instalado como `<sys/shm.h>` (o Android não tem
+  SysV shm) e `-D_PATH_TMP` fornecido (o `<paths.h>` do Bionic não o define).
+- **loader desacoplado** (`PROOT_UNBUNDLE_LOADER`): evita o empacotamento via
+  `objcopy` (que exige o objcopy do alvo e falhava com "architecture UNKNOWN").
+- **ashmem_memfd.c**: recebe `#include <string.h>` (usa `strcmp`/`memset`).
+- loader de 32 bits desativado (o guest é sempre aarch64).
+
+O único passo não reproduzido no dispositivo foi o **link estático do PRoot** —
+o Termux não possui libc estática — porém o CI compilou e publicou os binários
+com sucesso. Ver §8 (riscos).
 
 ## 4. Rootfs, provisionamento e persistência
 
@@ -171,11 +186,13 @@ Protocolo implementado conforme a documentação oficial da versão instalada
 
 | Item | Status |
 |---|---|
-| Cadeia Alpine → Node → Pi → RPC dentro do PRoot | ✅ validado no dispositivo (Termux) |
+| Cadeia Alpine → Node → Pi → RPC dentro do PRoot | ✅ validado no dispositivo (Termux) e por CI (smoke test) |
 | PRoot Bionic executando Node/Pi | ✅ validado no dispositivo |
-| Compilação **estática** do PRoot com NDK | ⚠️ feita no CI (o Termux não tem libc estática) |
+| Compilação do PRoot com o NDK | ✅ CI verde (`Build PRoot (aarch64)`), binários publicados |
 | Extração do rootfs com `TarExtractor` | ✅ testes unitários (arquivos, dirs, symlinks, nomes longos) |
 | Instalação de pacotes `apk` / `npm -g` sob PRoot no aparelho | ✅ validado no dispositivo |
 | `apk`/DNS no aparelho | ✅ validado |
+| Build do APK (lint + testes + R8) | ✅ CI verde; APK ~1,5 MB assinado (arm64-v8a) |
+| Execução do APK em aparelho real (init do Python/Compose, PRoot, Pi) | ⚠️ precisa de teste em dispositivo real |
 | Comportamento em aparelhos com seccomp agressivo | ⚠️ fallback `PROOT_NO_SECCOMP=1` disponível |
 | Phantom Process Killer em sessões longas | ⚠️ mitigado por FGS + wake lock; testar em aparelho |
