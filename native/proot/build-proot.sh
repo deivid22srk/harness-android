@@ -160,7 +160,7 @@ echo "==> PRoot $PROOT_REF"
 git clone --depth 1 --branch "$PROOT_REF" "$PROOT_REPO" "$WORK/proot"
 cd "$WORK/proot/src"
 
-CFLAGS="-O2 -fPIC -DARG_MAX=131072 -I$WORK/sysroot/include"
+CFLAGS="-O2 -fPIC -DARG_MAX=131072 -include string.h -I$WORK/sysroot/include"
 # -landroid-shmem resolves against the shared shim we bundle; talloc is static.
 LDFLAGS="-Wl,-z,noexecstack -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -Wl,-Bdynamic -landroid-shmem"
 
