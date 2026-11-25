@@ -511,7 +511,7 @@ fun AboutSection() {
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         SettingsInfoRow(
-            title = stringResource(R.string.settings_about_version),
+            title = stringResource(R.string.settings_about_version_label),
             value = appVersionName(),
         )
         SettingsInfoRow(
