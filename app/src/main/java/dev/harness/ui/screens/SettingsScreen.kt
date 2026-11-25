@@ -1,8 +1,6 @@
 package dev.harness.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,179 +14,231 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.harness.HarnessViewModel
+import dev.harness.HarnessUiState
 import dev.harness.ModelOption
+import dev.harness.R
 import dev.harness.core.settings.Provider
 import dev.harness.core.settings.Providers
-import dev.harness.core.state.ChatState
+import dev.harness.ui.components.HBadge
+import dev.harness.ui.components.HButton
+import dev.harness.ui.components.HButtonDefaults
+import dev.harness.ui.components.HCard
+import dev.harness.ui.components.HChip
+import dev.harness.ui.components.HDialog
+import dev.harness.ui.components.HIconButton
+import dev.harness.ui.components.HPasswordField
+import dev.harness.ui.components.HSectionTitle
+import dev.harness.ui.components.HTextField
+import dev.harness.ui.components.CollapsibleSection
+import dev.harness.ui.components.HCodeBlock
+import dev.harness.ui.components.touchTargetClickable
 import dev.harness.ui.theme.HarnessTheme
 import dev.harness.ui.theme.MonoStyle
 import dev.harness.ui.theme.Radii
 import dev.harness.ui.theme.Space
+import androidx.compose.ui.semantics.Role
 
+/** Settings: providers, keys, models, appearance, diagnostics, about. */
 @Composable
 fun SettingsScreen(
-    providers: List<Provider>,
-    selectedProvider: String,
-    thinkingLevel: String,
-    diagnostics: String,
-    onSelectProvider: (String) -> Unit,
-    onSaveKey: (String, String) -> Boolean,
-    onAddCustomProvider: (String, String, String, String, String) -> Unit,
-    onRemoveCustomProvider: (String) -> Unit,
-    onOpenModels: (String) -> Unit,
-    onClearEnvironment: () -> Unit,
+    uiState: HarnessUiState,
+    viewModel: HarnessViewModel,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val colors = HarnessTheme
-    var activeProvider by remember(selectedProvider) { mutableStateOf(selectedProvider) }
-    var keyDraft by remember(activeProvider) { mutableStateOf("") }
-    var keySaved by remember(activeProvider) { mutableStateOf(false) }
-    var showDiagnostics by remember { mutableStateOf(false) }
-    var showAddCustom by remember { mutableStateOf(false) }
+    var showAddCustom by rememberSaveable { mutableStateOf(false) }
+    var showReinstallConfirm by rememberSaveable { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
 
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
+            .background(colors.background)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Space.lg),
     ) {
-        Spacer(Modifier.height(Space.lg))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = Space.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.a11y_back),
+                onClick = onBack,
+                tint = colors.textPrimary,
+            )
             Text(
-                "Configurações",
+                stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
                 color = colors.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onBack) { Text("Voltar", color = colors.textSecondary) }
-        }
-
-        SectionTitle("Provedor de IA")
-        providers.forEach { provider ->
-            ProviderRow(
-                provider = provider,
-                selected = provider.id == activeProvider,
-                    isCustom = provider.api != null,
-                onClick = {
-                    activeProvider = provider.id
-                    keyDraft = ""
-                    keySaved = false
-                    onSelectProvider(provider.id)
-                },
-                onRemove = { onRemoveCustomProvider(provider.id) },
+                modifier = Modifier.padding(start = Space.xs),
             )
         }
-        Spacer(Modifier.height(Space.xs))
-        TextButton(onClick = { showAddCustom = true }) {
-            Text("+ Adicionar provedor personalizado", color = colors.textPrimary)
-        }
 
-        Spacer(Modifier.height(Space.md))
-        SectionTitle("Chave de API — ${providers.firstOrNull { it.id == activeProvider }?.label ?: activeProvider}")
-        OutlinedTextField(
-            value = keyDraft,
-            onValueChange = { keyDraft = it; keySaved = false },
-            placeholder = { Text(providers.firstOrNull { it.id == activeProvider }?.keyHint.orEmpty().ifBlank { "cole a chave" }) },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-            modifier = Modifier.fillMaxWidth(),
+        // ------------------------------------------------ Provider
+        HSectionTitle(stringResource(R.string.settings_section_provider))
+        ProviderList(
+            providers = uiState.providers,
+            selected = uiState.selectedProvider,
+            onSelect = viewModel::selectProvider,
+            onRemove = viewModel::removeCustomProvider,
         )
-        Spacer(Modifier.height(Space.sm))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(
-                enabled = keyDraft.isNotBlank(),
-                onClick = {
-                    if (onSaveKey(activeProvider, keyDraft)) {
-                        keyDraft = ""
-                        keySaved = true
-                    }
-                },
-            ) { Text("Salvar chave", color = if (keyDraft.isNotBlank()) colors.textPrimary else colors.textTertiary) }
-            if (keySaved) {
-                Text("Chave salva", style = MaterialTheme.typography.bodySmall, color = colors.toolOk)
+        HButton(
+            stringResource(R.string.settings_add_provider),
+            onClick = { showAddCustom = true },
+            variant = HButtonDefaults.Variant.Ghost,
+        )
+
+        // ------------------------------------------------ API key
+        val activeProvider = uiState.providers.firstOrNull { it.id == uiState.selectedProvider }
+        HSectionTitle(
+            stringResource(
+                R.string.settings_key_section,
+                activeProvider?.label ?: uiState.selectedProvider,
+            ),
+        )
+        ProviderKeySection(
+            uiState = uiState,
+            activeProvider = activeProvider,
+            onSave = viewModel::saveApiKey,
+        )
+
+        // ------------------------------------------------ Models
+        HSectionTitle(stringResource(R.string.settings_section_models))
+        HButton(
+            stringResource(R.string.settings_get_models),
+            onClick = { viewModel.openModelsDialog(uiState.selectedProvider) },
+            variant = HButtonDefaults.Variant.Secondary,
+        )
+        Spacer(Modifier.height(Space.xs))
+        Text(
+            stringResource(R.string.settings_models_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textTertiary,
+        )
+
+        // ------------------------------------------------ Appearance
+        HSectionTitle(stringResource(R.string.settings_section_appearance))
+        HCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    ThemeModeOption("system", uiState.themeMode, stringResource(R.string.settings_theme_system), viewModel::setThemeMode)
+                    ThemeModeOption("light", uiState.themeMode, stringResource(R.string.settings_theme_light), viewModel::setThemeMode)
+                    ThemeModeOption("dark", uiState.themeMode, stringResource(R.string.settings_theme_dark), viewModel::setThemeMode)
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Space.md),
+                ) {
+                    Text(
+                        stringResource(R.string.settings_dynamic_label),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textPrimary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ToggleSwitch(checked = uiState.dynamicColor, onCheckedChange = viewModel::setDynamicColor)
+                }
+                Text(
+                    stringResource(R.string.settings_dynamic_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textTertiary,
+                )
+                Text(
+                    stringResource(R.string.settings_font_size),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textPrimary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    FontScaleOption(0.9f, uiState.fontScale, stringResource(R.string.settings_font_small), viewModel::setFontScale)
+                    FontScaleOption(1f, uiState.fontScale, stringResource(R.string.settings_font_default), viewModel::setFontScale)
+                    FontScaleOption(1.15f, uiState.fontScale, stringResource(R.string.settings_font_large), viewModel::setFontScale)
+                    FontScaleOption(1.3f, uiState.fontScale, stringResource(R.string.settings_font_xlarge), viewModel::setFontScale)
+                }
             }
         }
-        Text(
-            "A chave é cifrada com a Keystore do aparelho e nunca sai do app.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textTertiary,
-        )
 
-        Spacer(Modifier.height(Space.md))
-        SectionTitle("Modelos")
-        TextButton(onClick = { onOpenModels(activeProvider) }) {
-            Text("Obter modelos", color = colors.textPrimary)
+        // ------------------------------------------------ Default thinking
+        HSectionTitle(stringResource(R.string.settings_section_thinking))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            listOf("off", "low", "medium", "high").forEach { level ->
+                HChip(
+                    text = thinkingLabel(level),
+                    selected = uiState.thinkingLevel == level,
+                    onClick = { viewModel.pickThinking(level) },
+                )
+            }
         }
+
+        // ------------------------------------------------ Storage
+        HSectionTitle(stringResource(R.string.settings_section_storage))
+        HButton(
+            stringResource(R.string.settings_reinstall_env),
+            onClick = { showReinstallConfirm = true },
+            variant = HButtonDefaults.Variant.Danger,
+        )
+        Spacer(Modifier.height(Space.xs))
         Text(
-            "Escolha quais modelos deste provedor ficam disponíveis para uso.",
+            stringResource(R.string.settings_reinstall_note),
             style = MaterialTheme.typography.bodySmall,
             color = colors.textTertiary,
         )
 
-        Spacer(Modifier.height(Space.lg))
-        SectionTitle("Raciocínio padrão")
-        Text(thinkingLevel, style = MonoStyle, color = colors.textSecondary)
-
-        Spacer(Modifier.height(Space.lg))
-        SectionTitle("Armazenamento")
-        TextButton(onClick = onClearEnvironment) {
-            Text("Reinstalar ambiente", color = colors.toolError)
-        }
-        Text(
-            "Remove o Alpine e as ferramentas instaladas. As chaves são preservadas.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textTertiary,
-        )
-
-        Spacer(Modifier.height(Space.lg))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SectionTitle("Diagnóstico", Modifier.weight(1f))
-            Icon(
-                Icons.Default.KeyboardArrowDown,
-                contentDescription = null,
-                tint = colors.textTertiary,
-                modifier = Modifier.size(20.dp).clickable { showDiagnostics = !showDiagnostics },
+        // ------------------------------------------------ Diagnostics
+        HSectionTitle(stringResource(R.string.settings_section_diagnostics))
+        CollapsibleSection(title = stringResource(R.string.onboarding_log_title)) {
+            HCodeBlock(
+                code = uiState.diagnostics.ifBlank { stringResource(R.string.settings_diagnostics_empty) },
+                language = "log",
+            )
+            Spacer(Modifier.height(Space.sm))
+            HButton(
+                stringResource(R.string.settings_copy_diagnostics),
+                onClick = { clipboard.setText(AnnotatedString(uiState.diagnostics)) },
+                variant = HButtonDefaults.Variant.Secondary,
             )
         }
-        if (showDiagnostics) {
-            Text(diagnostics.ifBlank { "(sem logs)" }, style = MonoStyle, color = colors.textSecondary)
-        }
 
-        Spacer(Modifier.height(Space.lg))
-        SectionTitle("Licenças")
+        // ------------------------------------------------ About
+        HSectionTitle(stringResource(R.string.settings_section_about))
         Text(
-            "Este app usa PRoot (GPL-2.0), Alpine Linux e Pi (MIT). Veja THIRD_PARTY_NOTICES.md no repositório.",
+            stringResource(R.string.settings_about_version, appVersionName()),
+            style = MonoStyle,
+            color = colors.textSecondary,
+        )
+        Spacer(Modifier.height(Space.xs))
+        Text(
+            stringResource(R.string.settings_licenses_text),
             style = MaterialTheme.typography.bodySmall,
             color = colors.textTertiary,
         )
@@ -199,165 +249,202 @@ fun SettingsScreen(
         AddCustomProviderDialog(
             onDismiss = { showAddCustom = false },
             onAdd = { id, label, baseUrl, api, models ->
-                onAddCustomProvider(id, label, baseUrl, api, models)
+                viewModel.addCustomProvider(id, label, baseUrl, api, models)
                 showAddCustom = false
             },
+        )
+    }
+    if (showReinstallConfirm) {
+        HDialog(
+            title = stringResource(R.string.settings_reinstall_confirm_title),
+            text = {
+                Text(
+                    stringResource(R.string.settings_reinstall_confirm_text),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textSecondary,
+                )
+            },
+            onDismiss = { showReinstallConfirm = false },
+            confirmLabel = stringResource(R.string.settings_reinstall_confirm_yes),
+            onConfirm = {
+                viewModel.clearEnvironment()
+                showReinstallConfirm = false
+            },
+            confirmEnabled = true,
+            dismissLabel = stringResource(R.string.action_cancel),
+        )
+    }
+
+    uiState.modelsDialogProvider?.let { providerId ->
+        val label = uiState.providers.firstOrNull { it.id == providerId }?.label ?: providerId
+        ModelsDialog(
+            providerLabel = label,
+            loading = uiState.modelsLoading,
+            models = uiState.models,
+            error = uiState.modelsError,
+            onToggle = viewModel::toggleModel,
+            onSelectAll = viewModel::selectAllModels,
+            onSave = viewModel::saveModelSelection,
+            onDismiss = viewModel::closeModelsDialog,
         )
     }
 }
 
 @Composable
-fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = HarnessTheme.textTertiary,
-        modifier = modifier.padding(vertical = Space.sm),
-    )
-}
-
-@Composable
-private fun ProviderRow(
-    provider: Provider,
-    selected: Boolean,
-    isCustom: Boolean,
-    onClick: () -> Unit,
-    onRemove: () -> Unit,
+private fun ProviderList(
+    providers: List<Provider>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onRemove: (String) -> Unit,
 ) {
     val colors = HarnessTheme
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(Radii.sm))
-            .background(if (selected) colors.accentMuted else colors.surface)
-            .border(1.dp, colors.border, RoundedCornerShape(Radii.sm))
-            .clickable(onClick = onClick)
-            .padding(horizontal = Space.md, vertical = Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(provider.label, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
-            if (isCustom) {
-                Text(provider.baseUrl.orEmpty(), style = MonoStyle, color = colors.textTertiary, maxLines = 1)
+    Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        providers.forEach { provider ->
+            val isSelected = provider.id == selected
+            val isCustom = provider.api != null
+            val shape = Radii.shapeSm
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp)
+                    .touchTargetClickable(role = Role.Button, onClick = { onSelect(provider.id) }, shape = shape)
+                    .background(if (isSelected) colors.accentContainer else colors.surfaceElevated, shape)
+                    .padding(horizontal = Space.md, vertical = Space.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.sm),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        provider.label,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (isSelected) colors.onAccentContainer else colors.textPrimary,
+                    )
+                    if (isCustom) {
+                        Text(
+                            provider.baseUrl.orEmpty(),
+                            style = MonoStyle,
+                            color = colors.textTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (isCustom) {
+                    HButton(
+                        stringResource(R.string.provider_remove),
+                        onClick = { onRemove(provider.id) },
+                        variant = HButtonDefaults.Variant.Ghost,
+                    )
+                }
             }
         }
-        if (isCustom) {
-            Text(
-                "remover",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.toolError,
-                modifier = Modifier.clickable(onClick = onRemove).padding(Space.xs),
-            )
-        }
-        Text(provider.envVar, style = MonoStyle, color = colors.textTertiary)
     }
 }
 
 @Composable
-private fun AddCustomProviderDialog(
-    onDismiss: () -> Unit,
-    onAdd: (String, String, String, String, String) -> Unit,
+private fun ProviderKeySection(
+    uiState: HarnessUiState,
+    activeProvider: Provider?,
+    onSave: (String, String) -> Boolean,
 ) {
     val colors = HarnessTheme
-    var id by remember { mutableStateOf("") }
-    var label by remember { mutableStateOf("") }
-    var baseUrl by remember { mutableStateOf("") }
-    var api by remember { mutableStateOf(Providers.APIS.first()) }
-    var models by remember { mutableStateOf("") }
-    var apiExpanded by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = colors.surfaceElevated,
-        title = { Text("Provedor personalizado", color = colors.textPrimary) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-                OutlinedTextField(
-                    value = id, onValueChange = { id = it },
-                    label = { Text("identificador") },
-                    placeholder = { Text("meu-provedor") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = label, onValueChange = { label = it },
-                    label = { Text("nome") },
-                    placeholder = { Text("Meu Provedor") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = baseUrl, onValueChange = { baseUrl = it },
-                    label = { Text("base URL") },
-                    placeholder = { Text("https://api.exemplo.com/v1") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
-                )
-                Text("API", style = MaterialTheme.typography.labelLarge, color = colors.textTertiary)
-                Box {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radii.sm))
-                            .background(colors.surface)
-                            .border(1.dp, colors.border, RoundedCornerShape(Radii.sm))
-                            .clickable { apiExpanded = !apiExpanded }
-                            .padding(horizontal = Space.md, vertical = Space.sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(api, style = MonoStyle, color = colors.textPrimary, modifier = Modifier.weight(1f))
-                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = colors.textTertiary)
+    var keyDraft by rememberSaveable(uiState.selectedProvider) { mutableStateOf("") }
+    var keySaved by rememberSaveable(uiState.selectedProvider) { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+        HPasswordField(
+            value = keyDraft,
+            onValueChange = {
+                keyDraft = it
+                keySaved = false
+            },
+            placeholder = activeProvider?.keyHint?.ifBlank { null }
+                ?: stringResource(R.string.settings_key_hint),
+            visibilityLabel = stringResource(R.string.settings_key_show),
+            hideLabel = stringResource(R.string.settings_key_hide),
+            keyboardOptions = KeyboardOptions(
+                autoCorrectEnabled = false,
+                capitalization = KeyboardCapitalization.None,
+                imeAction = ImeAction.Done,
+            ),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.md),
+        ) {
+            HButton(
+                stringResource(R.string.settings_key_save),
+                onClick = {
+                    if (onSave(uiState.selectedProvider, keyDraft)) {
+                        keyDraft = ""
+                        keySaved = true
                     }
-                    if (apiExpanded) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 44.dp)
-                                .clip(RoundedCornerShape(Radii.sm))
-                                .background(colors.surface)
-                                .border(1.dp, colors.border, RoundedCornerShape(Radii.sm)),
-                        ) {
-                            Providers.APIS.forEach { option ->
-                                Text(
-                                    option,
-                                    style = MonoStyle,
-                                    color = colors.textPrimary,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { api = option; apiExpanded = false }
-                                        .padding(horizontal = Space.md, vertical = Space.sm),
-                                )
-                            }
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = models, onValueChange = { models = it },
-                    label = { Text("modelos (um por linha ou vírgula)") },
-                    placeholder = { Text("gpt-4o-mini, llava") },
-                    minLines = 2,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                },
+                enabled = keyDraft.isNotBlank(),
+                variant = HButtonDefaults.Variant.Primary,
+            )
+            if (keySaved) {
                 Text(
-                    "O Pi exige ao menos um modelo por provedor. Informe os IDs que o endpoint expõe.",
+                    stringResource(R.string.settings_key_saved),
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textTertiary,
+                    color = colors.toolOk,
                 )
             }
-        },
-        confirmButton = {
-            val valid = id.isNotBlank() && baseUrl.isNotBlank() && models.isNotBlank()
-            TextButton(
-                enabled = valid,
-                onClick = { onAdd(id, label, baseUrl, api, models) },
-            ) { Text("Adicionar", color = if (valid) colors.textPrimary else colors.textTertiary) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar", color = colors.textSecondary) } },
+        }
+        Text(
+            stringResource(R.string.settings_key_security_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textTertiary,
+        )
+    }
+}
+
+/** App version from PackageManager (buildConfig is not enabled). */
+@Composable
+private fun appVersionName(): String {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull()
+    } ?: "—"
+}
+
+@Composable
+private fun ThemeModeOption(
+    mode: String,
+    current: String,
+    label: String,
+    onPick: (String) -> Unit,
+) {
+    HChip(text = label, selected = mode == current, onClick = { onPick(mode) })
+}
+
+@Composable
+private fun FontScaleOption(
+    scale: Float,
+    current: Float,
+    label: String,
+    onPick: (Float) -> Unit,
+) {
+    HChip(text = label, selected = kotlin.math.abs(scale - current) < 0.01f, onClick = { onPick(scale) })
+}
+
+/** Minimal switch aligned with the palette (material3 Switch). */
+@Composable
+private fun ToggleSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedTrackColor = HarnessTheme.accentButton,
+            checkedThumbColor = HarnessTheme.onAccent,
+            uncheckedTrackColor = HarnessTheme.surfaceHigh,
+            uncheckedThumbColor = HarnessTheme.textSecondary,
+        ),
     )
 }
 
-/**
- * "Obter modelos" dialog: lists the models reported by Pi and lets the user
- * select/deselect them, including select-all / clear-all.
- */
+/** "Obter modelos" dialog. */
 @Composable
 fun ModelsDialog(
     providerLabel: String,
@@ -371,14 +458,14 @@ fun ModelsDialog(
 ) {
     val colors = HarnessTheme
     val selectedCount = models.count { it.selected }
-    AlertDialog(
+    androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = colors.surfaceElevated,
         title = {
             Column {
-                Text("Modelos — $providerLabel", color = colors.textPrimary)
+                Text(stringResource(R.string.models_title, providerLabel), color = colors.textPrimary)
                 Text(
-                    "$selectedCount de ${models.size} selecionados",
+                    stringResource(R.string.models_selected_count, selectedCount, models.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textTertiary,
                 )
@@ -392,27 +479,30 @@ fun ModelsDialog(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = colors.accent)
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = colors.accent,
+                        )
                         Spacer(Modifier.size(Space.md))
-                        Text("Obtendo modelos…", color = colors.textSecondary)
+                        Text(stringResource(R.string.models_loading), color = colors.textSecondary)
                     }
-                    error != null -> Text(error, color = colors.toolError, style = MaterialTheme.typography.bodySmall)
+                    error != null -> Text(error, color = colors.toolErrorText, style = MaterialTheme.typography.bodySmall)
                     models.isEmpty() -> Text(
-                        "Nenhum modelo encontrado. Verifique a chave de API do provedor.",
+                        stringResource(R.string.models_empty),
                         color = colors.textTertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     else -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                            TextButton(onClick = { onSelectAll(true) }) { Text("Selecionar tudo", color = colors.textPrimary) }
-                            TextButton(onClick = { onSelectAll(false) }) { Text("Limpar", color = colors.textSecondary) }
+                            HButton(stringResource(R.string.models_select_all), { onSelectAll(true) }, variant = HButtonDefaults.Variant.Ghost)
+                            HButton(stringResource(R.string.models_clear), { onSelectAll(false) }, variant = HButtonDefaults.Variant.Ghost)
                         }
                         Spacer(Modifier.height(Space.xs))
-                        LazyColumn(
+                        androidx.compose.foundation.lazy.LazyColumn(
                             Modifier.fillMaxWidth().heightIn(max = 420.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            items(models, key = { it.qualifiedId }) { option ->
+                            androidx.compose.foundation.lazy.items(models, key = { it.qualifiedId }) { option ->
                                 ModelRow(option) { onToggle(option.qualifiedId) }
                             }
                         }
@@ -421,11 +511,15 @@ fun ModelsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onSave, enabled = !loading && models.isNotEmpty()) {
-                Text("Salvar", color = colors.textPrimary)
+            androidx.compose.material3.TextButton(onClick = onSave, enabled = !loading && models.isNotEmpty()) {
+                Text(stringResource(R.string.models_save), color = if (!loading && models.isNotEmpty()) colors.accentText else colors.textTertiary)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar", color = colors.textSecondary) } },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = colors.textSecondary)
+            }
+        },
     )
 }
 
@@ -435,22 +529,27 @@ private fun ModelRow(option: ModelOption, onToggle: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.sm))
-            .clickable(onClick = onToggle)
-            .padding(vertical = Space.sm, horizontal = Space.xs),
+            .clip(Radii.shapeSm)
+            .background(colors.surface)
+            .touchTargetClickable { onToggle() }
+            .padding(horizontal = Space.md, vertical = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.md),
     ) {
         Box(
             Modifier
-                .size(18.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(if (option.selected) colors.toolOk else colors.surface)
-                .border(1.dp, if (option.selected) colors.toolOk else colors.border, RoundedCornerShape(4.dp)),
+                .size(20.dp)
+                .clip(Radii.shapeSm)
+                .background(if (option.selected) colors.toolOk else colors.surfaceElevated),
             contentAlignment = Alignment.Center,
         ) {
             if (option.selected) {
-                Text("✓", color = colors.background, style = MaterialTheme.typography.labelLarge)
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Default.Check,
+                    contentDescription = null,
+                    tint = colors.background,
+                    modifier = Modifier.size(14.dp),
+                )
             }
         }
         Column(Modifier.weight(1f)) {
@@ -460,94 +559,92 @@ private fun ModelRow(option: ModelOption, onToggle: () -> Unit) {
     }
 }
 
-/** Bottom-sheet style model picker. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun ModelPickerSheet(
-    state: ChatState,
-    models: List<Pair<String, String>>,
-    onPick: (String, String) -> Unit,
+private fun AddCustomProviderDialog(
     onDismiss: () -> Unit,
+    onAdd: (String, String, String, String, String) -> Unit,
 ) {
+    var id by rememberSaveable { mutableStateOf("") }
+    var label by rememberSaveable { mutableStateOf("") }
+    var baseUrl by rememberSaveable { mutableStateOf("") }
+    var api by rememberSaveable { mutableStateOf(Providers.APIS.first()) }
+    var models by rememberSaveable { mutableStateOf("") }
+    var apiExpanded by rememberSaveable { mutableStateOf(false) }
     val colors = HarnessTheme
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = Radii.lg, topEnd = Radii.lg))
-            .background(colors.surfaceElevated)
-            .padding(Space.lg),
-        verticalArrangement = Arrangement.spacedBy(Space.xs),
-    ) {
-        Text("Modelo", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-        Text(
-            state.model?.let { "${it.name} · ${it.provider}" } ?: "Nenhum modelo selecionado",
-            style = MonoStyle,
-            color = colors.textSecondary,
-        )
-        Spacer(Modifier.height(Space.sm))
-        if (models.isEmpty()) {
-            Text(
-                "Nenhum modelo selecionado. Use Configurações → Obter modelos.",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary,
-            )
-        }
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            items(models, key = { "${it.first}/${it.second}" }) { (provider, id) ->
+    val valid = id.isNotBlank() && baseUrl.startsWith("http") && models.isNotBlank()
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surfaceElevated,
+        title = { Text(stringResource(R.string.provider_custom_title), color = colors.textPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                HTextField(id, { id = it }, label = stringResource(R.string.provider_custom_id), placeholder = "meu-provedor", singleLine = true)
+                HTextField(label, { label = it }, label = stringResource(R.string.provider_custom_name), placeholder = "Meu Provedor", singleLine = true)
+                HTextField(
+                    baseUrl, { baseUrl = it },
+                    label = stringResource(R.string.provider_custom_base_url),
+                    placeholder = "https://api.exemplo.com/v1",
+                    singleLine = true,
+                    isError = baseUrl.isNotBlank() && !baseUrl.startsWith("http"),
+                )
+                ExposedDropdownMenuBox(
+                    expanded = apiExpanded,
+                    onExpandedChange = { apiExpanded = it },
+                ) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = api,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.provider_custom_api)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = apiExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colors.accent,
+                            unfocusedBorderColor = colors.borderStrong,
+                        ),
+                    )
+                    androidx.compose.material3.ExposedDropdownMenu(
+                        expanded = apiExpanded,
+                        onDismissRequest = { apiExpanded = false },
+                    ) {
+                        Providers.APIS.forEach { option ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(option, style = MonoStyle) },
+                                onClick = {
+                                    api = option
+                                    apiExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                HTextField(
+                    models, { models = it },
+                    label = stringResource(R.string.provider_custom_models),
+                    placeholder = stringResource(R.string.provider_custom_models_hint),
+                    minLines = 2,
+                )
                 Text(
-                    "$provider/$id",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textPrimary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radii.sm))
-                        .clickable { onPick(provider, id) }
-                        .padding(vertical = Space.sm, horizontal = Space.sm),
+                    stringResource(R.string.provider_custom_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textTertiary,
                 )
             }
-        }
-        Spacer(Modifier.height(Space.sm))
-        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-            Text("Fechar", color = colors.textSecondary)
-        }
-    }
-}
-
-/** Bottom-sheet style reasoning picker. */
-@Composable
-fun ThinkingPickerSheet(
-    levels: List<String>,
-    current: String,
-    onPick: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val colors = HarnessTheme
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = Radii.lg, topEnd = Radii.lg))
-            .background(colors.surfaceElevated)
-            .padding(Space.lg),
-        verticalArrangement = Arrangement.spacedBy(Space.xs),
-    ) {
-        Text("Raciocínio", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-        Spacer(Modifier.height(Space.xs))
-        levels.forEach { level ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.sm))
-                    .background(if (level == current) colors.accentMuted else colors.surfaceElevated)
-                    .clickable { onPick(level) }
-                    .padding(vertical = Space.sm, horizontal = Space.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(thinkingLabel(level), style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary, modifier = Modifier.weight(1f))
-                if (level == current) Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = colors.textTertiary)
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(enabled = valid, onClick = { onAdd(id, label, baseUrl, api, models) }) {
+                Text(
+                    stringResource(R.string.provider_custom_add),
+                    color = if (valid) colors.accentText else colors.textTertiary,
+                )
             }
-        }
-        Spacer(Modifier.height(Space.sm))
-        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-            Text("Fechar", color = colors.textSecondary)
-        }
-    }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = colors.textSecondary)
+            }
+        },
+    )
 }
