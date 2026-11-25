@@ -31,9 +31,12 @@ if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
 fi
 
 HOST_TAG="linux-x86_64"
-case "$(uname -s)-$(uname -m)" in
-    Linux-aarch64|Linux-arm64) HOST_TAG="linux-aarch64" ;;
-esac
+for candidate in linux-x86_64 linux-aarch64; do
+    if [ -d "$NDK/toolchains/llvm/prebuilt/$candidate" ]; then
+        HOST_TAG="$candidate"
+        break
+    fi
+done
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/$HOST_TAG"
 API="${ANDROID_API:-26}"
 CC="$TOOLCHAIN/bin/aarch64-linux-android${API}-clang"
@@ -110,6 +113,7 @@ EOF
     make -j"$NPROC" > make.log 2>&1 || { tail -40 make.log; exit 1; }
     # The static archive is assembled from the object files (Termux recipe).
     ( cd bin/default && "$AR" rcu libtalloc.a talloc*.o )
+    test -s bin/default/libtalloc.a || { echo "error: libtalloc.a not produced" >&2; exit 1; }
     cp bin/default/libtalloc.a "$WORK/sysroot/lib/"
     cp talloc.h "$WORK/sysroot/include/"
 )

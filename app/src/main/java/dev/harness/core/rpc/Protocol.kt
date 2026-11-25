@@ -244,7 +244,7 @@ sealed interface AssistantStreamEvent {
                 )
                 "toolcall_end" -> ToolcallEnd(
                     obj["contentIndex"]?.jsonPrimitive?.intOrNull ?: 0,
-                    obj["toolCall"]?.let(ToolCall::from) ?: ToolCall("", "", null),
+                    (obj["toolCall"] as? JsonObject)?.let(ToolCall::from) ?: ToolCall("", "", null),
                 )
                 "done" -> Done(obj["reason"]?.str())
                 "error" -> StreamError(obj["reason"]?.str(), obj["error"]?.str())
