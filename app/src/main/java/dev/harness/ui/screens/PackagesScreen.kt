@@ -506,7 +506,6 @@ internal fun OperationLogCard(
 }
 
 @Composable
-internal fun opLabel(
 private fun PackageRow(
     pkg: InstalledPackage,
     onRemove: () -> Unit,
