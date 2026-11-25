@@ -417,6 +417,10 @@ fun EnvironmentSection(
     var showUpdatePiConfirm by rememberSaveable { mutableStateOf(false) }
     var updatePiResult by remember { mutableStateOf<String?>(null) }
     val colors = HarnessTheme
+    // Resolved in composable context; the confirm callback is NOT composable.
+    val busyMsg = stringResource(R.string.settings_env_update_busy)
+    val doneMsg = stringResource(R.string.settings_env_update_done)
+    val failedMsg = stringResource(R.string.settings_env_update_failed)
     Column(
         Modifier
             .fillMaxSize()
@@ -465,9 +469,6 @@ fun EnvironmentSection(
             confirmLabel = stringResource(R.string.settings_env_update_action),
             onConfirm = {
                 showUpdatePiConfirm = false
-                val busyMsg = stringResource(R.string.settings_env_update_busy)
-                val doneMsg = stringResource(R.string.settings_env_update_done)
-                val failedMsg = stringResource(R.string.settings_env_update_failed)
                 if (uiState.chat.isBusy) {
                     viewModel.showNotice(busyMsg, dev.harness.core.state.NoticeLevel.Warning)
                 } else {
