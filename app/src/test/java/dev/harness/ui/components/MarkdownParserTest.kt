@@ -42,9 +42,11 @@ class MarkdownParserTest {
     @Test
     fun `ordered and unordered list items`() {
         val nodes = parseMarkdown("- um\n1. dois")
-        assertTrue(nodes[0] is MdNode.ListItem && !nodes[0].ordered)
-        assertTrue(nodes[1] is MdNode.ListItem && nodes[1].ordered)
-        assertEquals("1.", (nodes[1] as MdNode.ListItem).marker)
+        val first = nodes[0]
+        assertTrue(first is MdNode.ListItem && !first.ordered)
+        val second = nodes[1] as MdNode.ListItem
+        assertTrue(second.ordered)
+        assertEquals("1.", second.marker)
     }
 
     @Test
