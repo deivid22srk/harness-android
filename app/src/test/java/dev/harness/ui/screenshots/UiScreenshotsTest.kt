@@ -41,13 +41,15 @@ import java.io.File
 @Config(qualifiers = "+w412dp-h892dp", sdk = [34])
 class UiScreenshotsTest {
 
-    // Robolectric sandboxes System.getenv — the Gradle test config forwards the
-    // toggle as system properties (see app/build.gradle.kts testOptions).
-    private val enabled: Boolean = System.getProperty("harness.screenshots") == "1"
-    private val outDir = System.getProperty("harness.screenshots.dir") ?: "build/screenshots"
+    // Rendering is unconditional: Roborazzi's task type is pinned to Record via
+    // roborazzi.test.record=true (app/build.gradle.kts), and PNGs go to
+    // app/build/screenshots (matches the CI artifact glob). Robolectric's env
+    // sandbox makes getenv/property toggles unreliable here. The Gradle test
+    // task may run with CWD = module dir (app/) or repo root — resolve both.
+    private val outDir: String =
+        if (File(".").canonicalFile.name == "app") "build/screenshots" else "app/build/screenshots"
 
     private fun capture(name: String, dark: Boolean, fontScale: Float, content: @Composable () -> Unit) {
-        if (!enabled) return
         val path = File(outDir).apply { mkdirs() }
             .resolve("$name${if (dark) "_dark" else "_light"}_${if (fontScale == 1f) "1.0" else "1.3"}.png")
             .absolutePath
