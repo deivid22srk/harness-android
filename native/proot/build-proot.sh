@@ -123,7 +123,22 @@ Checking for HAVE_INCOHERENT_MMAP: OK
 Checking getconf large file support flags work: OK
 EOF
 # The bundled waf bootstrap shells out to `which`.
-printf '#!/bin/sh\nexec command -v "$1"\n' > "$WORK/hostbin/which"
+cat > "$WORK/hostbin/which" <<'SHIM'
+#!/bin/sh
+# Minimal `which` for the waf bootstrap.
+status=1
+for arg in "$@"; do
+    case "$arg" in
+        -a) continue ;;
+    esac
+    found=$(command -v "$arg" 2>/dev/null)
+    if [ -n "$found" ]; then
+        echo "$found"
+        status=0
+    fi
+done
+exit $status
+SHIM
 chmod +x "$WORK/hostbin/which"
 (
     cd "$WORK/talloc"
