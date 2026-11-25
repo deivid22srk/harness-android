@@ -204,6 +204,7 @@
     <string name="action_confirm">Confirmar</string>
     <string name="action_copy">Copiar</string>
     <string name="action_send">Enviar</string>
+    <string name="action_retry">Tentar novamente</string>
     <string name="a11y_back">Voltar</string>
     <string name="a11y_expand">Expandir %1$s</string>
     <string name="a11y_collapse">Recolher %1$s</string>
