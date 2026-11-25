@@ -21,8 +21,8 @@ class ProotCommand(private val paths: HarnessPaths) {
         val env = HashMap<String, String>()
         env["PROOT_TMP_DIR"] = paths.tmp.absolutePath
         env["PROOT_LOADER"] = paths.prootLoader.absolutePath
-        // Android's linker resolves the PRoot dependencies (libtalloc, libc)
-        // from this directory. Harmless when PRoot is statically linked.
+        // The PRoot binary is linked dynamically (Bionic libc + the bundled
+        // libandroid-shmem.so), so the loader must find them here.
         env["LD_LIBRARY_PATH"] = paths.nativeLibDir.absolutePath
         env.putAll(apiKeys)
         return env
@@ -44,7 +44,6 @@ class ProotCommand(private val paths: HarnessPaths) {
             "-b", "/proc",
             "-b", "/sys",
             "-b", "${paths.home.absolutePath}:/root",
-            "-b", "${paths.prootLoader.parentFile?.absolutePath ?: paths.nativeLibDir.absolutePath}:/libs:ro",
             "-w", "/root",
         )
         // Fake files for Android's restricted /proc so Node's os.cpus() and

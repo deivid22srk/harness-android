@@ -42,7 +42,7 @@ class RpcClient(
     private val pending = ConcurrentHashMap<String, Channel<PiResponseRecord>>()
     private val writeLock = Mutex()
 
-    private val _records = MutableSharedFlow<PiRecord>(replay = 0, extraBufferCapacity = 512)
+    private val _records = MutableSharedFlow<PiRecord>(replay = 128, extraBufferCapacity = 512)
     /** Every inbound record (responses, events, extension UI, malformed). */
     val records: SharedFlow<PiRecord> = _records.asSharedFlow()
 

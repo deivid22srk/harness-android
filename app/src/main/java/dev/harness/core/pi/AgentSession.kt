@@ -105,8 +105,11 @@ class AgentSession(
             scope = scope,
         )
         rpc = client
-        client.start()
+        // Subscribe to the record stream before the reader starts so no event
+        // emitted during startup/handshake is lost. The client replays a small
+        // buffer to cover the subscription race.
         startPump(client)
+        client.start()
         startPublisher()
 
         // Handshake: state, models, and existing messages.
