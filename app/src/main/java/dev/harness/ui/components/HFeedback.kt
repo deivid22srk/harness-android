@@ -16,6 +16,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -104,7 +106,7 @@ fun HErrorState(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                androidx.compose.material.icons.Icons.Default.Warning,
+                Icons.Default.Warning,
                 contentDescription = null,
                 tint = colors.toolErrorText,
                 modifier = Modifier.size(24.dp),

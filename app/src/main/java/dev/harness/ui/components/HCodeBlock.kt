@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -97,7 +98,7 @@ private val ANNOTATION_PATTERN = Regex("""@[A-Za-z_][A-Za-z0-9_.]*""")
  *
  * Priority: strings -> comments -> annotations -> numbers -> keywords/types.
  */
-fun highlightCode(code: String, colors: CodeColors): AnnotatedString = buildAnnotatedString {
+internal fun highlightCode(code: String, colors: CodeColors): AnnotatedString = buildAnnotatedString {
     var index = 0
     val length = code.length
     while (index < length) {
@@ -217,7 +218,7 @@ fun HOutputBlock(
                 text = text,
                 style = dev.harness.ui.theme.MonoStyle,
                 color = colors.textSecondary,
-                maxLines = maxLines,
+                maxLines = maxLines ?: Int.MAX_VALUE,
                 modifier = Modifier.widthIn(max = 700.dp),
             )
         }

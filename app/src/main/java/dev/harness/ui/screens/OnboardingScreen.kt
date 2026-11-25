@@ -30,7 +30,7 @@ import dev.harness.ui.components.HButton
 import dev.harness.ui.components.HButtonDefaults
 import dev.harness.ui.components.HCodeBlock
 import dev.harness.ui.components.HProgressBar
-import dev.harness.ui.components.HProgressStep
+import dev.harness.ui.components.ProgressStep
 import dev.harness.ui.components.HProgressSteps
 import dev.harness.ui.theme.HarnessTheme
 import dev.harness.ui.theme.MonoStyle
@@ -184,7 +184,7 @@ private fun OnboardingFailure(
 }
 
 @Composable
-private fun provisionSteps(state: ProvisionState): List<HProgressStep> {
+private fun provisionSteps(state: ProvisionState): List<ProgressStep> {
     val labels = listOf(
         stringResource(R.string.onboarding_step_check),
         stringResource(R.string.onboarding_step_download),
@@ -203,5 +203,5 @@ private fun provisionSteps(state: ProvisionState): List<HProgressStep> {
         is ProvisionState.Ready -> labels.size
         is ProvisionState.Failed -> -1
     }
-    return HProgressStep.build(labels, currentIndex)
+    return ProgressStep.build(labels, currentIndex)
 }

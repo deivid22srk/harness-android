@@ -24,7 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -141,7 +142,7 @@ fun ProjectsScreen(
                 HEmptyState(
                     title = stringResource(R.string.projects_empty_title),
                     description = stringResource(R.string.projects_empty_desc),
-                    icon = Icons.Default.Folder,
+                    icon = Icons.Default.List,
                     actionLabel = stringResource(R.string.projects_new),
                     onAction = { showCreate = true },
                 )
@@ -249,7 +250,7 @@ private fun ProjectCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Default.Folder,
+                    Icons.Default.List,
                     contentDescription = null,
                     tint = colors.onAccentContainer,
                     modifier = Modifier.size(20.dp),

@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -160,7 +162,7 @@ private fun Chevron(expanded: Boolean) {
         label = "chevron",
     )
     androidx.compose.material3.Icon(
-        androidx.compose.material.icons.Icons.Default.KeyboardArrowRight,
+        Icons.Default.KeyboardArrowRight,
         contentDescription = null,
         tint = colors.textTertiary,
         modifier = Modifier

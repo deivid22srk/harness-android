@@ -1,6 +1,11 @@
 package dev.harness.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -589,13 +594,13 @@ private fun BusyIndicator(status: AgentStatus) {
             AgentStatus.Idle -> R.string.busy_streaming
         },
     )
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse")
+    val transition = rememberInfiniteTransition(label = "pulse")
     val alpha by transition.animateFloat(
         initialValue = 0.35f,
         targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(900),
-            androidx.compose.animation.core.RepeatMode.Reverse,
+        animationSpec = infiniteRepeatable(
+            tween(900),
+            RepeatMode.Reverse,
         ),
         label = "alpha",
     )

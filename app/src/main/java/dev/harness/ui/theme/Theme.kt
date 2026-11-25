@@ -308,11 +308,11 @@ fun HarnessThemeProvider(
             colorScheme = mapScheme(colors),
             typography = HarnessTypography,
             shapes = androidx.compose.material3.Shapes(
-                extraSmall = Radii.shapeSm,
-                small = Radii.shapeSm,
-                medium = Radii.shapeMd,
-                large = Radii.shapeLg,
-                extraLarge = Radii.shapeXl,
+                extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(Radii.sm),
+                small = androidx.compose.foundation.shape.RoundedCornerShape(Radii.sm),
+                medium = androidx.compose.foundation.shape.RoundedCornerShape(Radii.md),
+                large = androidx.compose.foundation.shape.RoundedCornerShape(Radii.lg),
+                extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(Radii.xl),
             ),
         ) {
             CompositionLocalProvider(LocalDensity provides scaled, content = content)
