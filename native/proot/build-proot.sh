@@ -191,8 +191,9 @@ export CFLAGS="-O2 -fPIC -DARG_MAX=131072 -I$WORK/sysroot/include"
 # Both talloc and the ashmem shim are linked statically so the resulting
 # libproot.so only needs Bionic system libraries (libc, libdl, liblog,
 # libandroid). This matters because Android does not reliably honor
-# LD_LIBRARY_PATH for app processes.
-export LDFLAGS="-Wl,-z,noexecstack -Wl,-z,origin -Wl,-rpath,\$ORIGIN \
+# LD_LIBRARY_PATH for app processes. (No $ORIGIN rpath: make would mangle it
+# to "RIGIN", and it is unnecessary for a self-contained binary.)
+export LDFLAGS="-Wl,-z,noexecstack \
     -L$WORK/sysroot/lib -Wl,-Bstatic -ltalloc -landroid-shmem -Wl,-Bdynamic -llog -landroid"
 
 MAKE_ARGS="CC=$CC LD=$CC AR=$AR STRIP=$STRIP \

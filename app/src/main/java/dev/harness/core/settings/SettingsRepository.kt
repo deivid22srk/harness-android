@@ -30,6 +30,8 @@ data class CustomProvider(
     val baseUrl: String,
     val api: String,
     val envVar: String,
+    /** Comma/newline separated model IDs this endpoint exposes (required by Pi). */
+    val models: String = "",
 )
 
 object Providers {
@@ -123,14 +125,23 @@ class SettingsRepository(context: Context) {
     )
 
     private fun encodeCustom(list: List<CustomProvider>): String =
-        list.joinToString("\u0001") { "${it.id}\u0002${it.label}\u0002${it.baseUrl}\u0002${it.api}\u0002${it.envVar}" }
+        list.joinToString("\u0001") {
+            listOf(it.id, it.label, it.baseUrl, it.api, it.envVar, it.models).joinToString("\u0002")
+        }
 
     private fun decodeCustom(raw: String): List<CustomProvider> {
         if (raw.isBlank()) return emptyList()
         return raw.split('\u0001').mapNotNull { entry ->
             val parts = entry.split('\u0002')
             if (parts.size < 5) return@mapNotNull null
-            CustomProvider(parts[0], parts[1], parts[2], parts[3], parts[4])
+            CustomProvider(
+                id = parts[0],
+                label = parts[1],
+                baseUrl = parts[2],
+                api = parts[3],
+                envVar = parts[4],
+                models = parts.getOrNull(5).orEmpty(),
+            )
         }
     }
 

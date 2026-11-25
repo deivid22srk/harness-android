@@ -60,7 +60,7 @@ fun SettingsScreen(
     diagnostics: String,
     onSelectProvider: (String) -> Unit,
     onSaveKey: (String, String) -> Boolean,
-    onAddCustomProvider: (String, String, String, String) -> Unit,
+    onAddCustomProvider: (String, String, String, String, String) -> Unit,
     onRemoveCustomProvider: (String) -> Unit,
     onOpenModels: (String) -> Unit,
     onClearEnvironment: () -> Unit,
@@ -98,7 +98,7 @@ fun SettingsScreen(
             ProviderRow(
                 provider = provider,
                 selected = provider.id == activeProvider,
-                isCustom = provider.api != null,
+                    isCustom = provider.api != null,
                 onClick = {
                     activeProvider = provider.id
                     keyDraft = ""
@@ -198,8 +198,8 @@ fun SettingsScreen(
     if (showAddCustom) {
         AddCustomProviderDialog(
             onDismiss = { showAddCustom = false },
-            onAdd = { id, label, baseUrl, api ->
-                onAddCustomProvider(id, label, baseUrl, api)
+            onAdd = { id, label, baseUrl, api, models ->
+                onAddCustomProvider(id, label, baseUrl, api, models)
                 showAddCustom = false
             },
         )
@@ -257,13 +257,14 @@ private fun ProviderRow(
 @Composable
 private fun AddCustomProviderDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, String, String, String) -> Unit,
+    onAdd: (String, String, String, String, String) -> Unit,
 ) {
     val colors = HarnessTheme
     var id by remember { mutableStateOf("") }
     var label by remember { mutableStateOf("") }
     var baseUrl by remember { mutableStateOf("") }
     var api by remember { mutableStateOf(Providers.APIS.first()) }
+    var models by remember { mutableStateOf("") }
     var apiExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -328,13 +329,26 @@ private fun AddCustomProviderDialog(
                         }
                     }
                 }
+                OutlinedTextField(
+                    value = models, onValueChange = { models = it },
+                    label = { Text("modelos (um por linha ou vírgula)") },
+                    placeholder = { Text("gpt-4o-mini, llava") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "O Pi exige ao menos um modelo por provedor. Informe os IDs que o endpoint expõe.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textTertiary,
+                )
             }
         },
         confirmButton = {
+            val valid = id.isNotBlank() && baseUrl.isNotBlank() && models.isNotBlank()
             TextButton(
-                enabled = id.isNotBlank() && baseUrl.isNotBlank(),
-                onClick = { onAdd(id, label, baseUrl, api) },
-            ) { Text("Adicionar", color = if (id.isNotBlank() && baseUrl.isNotBlank()) colors.textPrimary else colors.textTertiary) }
+                enabled = valid,
+                onClick = { onAdd(id, label, baseUrl, api, models) },
+            ) { Text("Adicionar", color = if (valid) colors.textPrimary else colors.textTertiary) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar", color = colors.textSecondary) } },
     )

@@ -269,7 +269,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         }.isSuccess
     }
 
-    fun addCustomProvider(id: String, label: String, baseUrl: String, api: String) {
+    fun addCustomProvider(id: String, label: String, baseUrl: String, api: String, models: String) {
         val safeId = id.trim().lowercase().replace(Regex("[^a-z0-9._-]"), "-")
         if (safeId.isBlank() || baseUrl.isBlank()) {
             _ui.value = _ui.value.copy(notice = "Informe um nome e uma URL válidos.")
@@ -283,6 +283,7 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
                 baseUrl = baseUrl.trim(),
                 api = api,
                 envVar = envVar,
+                models = models,
             ),
         )
         container.modelCatalog.syncModelsJson()

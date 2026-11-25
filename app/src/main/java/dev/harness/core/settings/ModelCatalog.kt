@@ -34,19 +34,34 @@ class ModelCatalog(
     private val modelsJson: File get() = File(paths.piDir, "agent/models.json")
 
     /**
-     * Writes models.json from the configured providers. Built-in providers need
-     * no entry unless the user only wants a subset of their models, which Pi
-     * cannot express — so we only write custom providers here.
+     * Writes models.json from the configured providers.
+     *
+     * Pi requires a custom provider to declare at least one model, otherwise it
+     * has nothing to offer and `--list-models`/startup report nothing for it.
+     * Each listed model ID becomes an entry so Pi's catalog is populated.
      */
     fun syncModelsJson() {
         val providers = linkedMapOf<String, Any>()
         for (custom in settings.customProviders()) {
-            providers[custom.id] = linkedMapOf(
+            val modelIds = custom.models
+                .split(',', '\n', ';')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+            val models = modelIds.map { id ->
+                linkedMapOf<String, Any>(
+                    "id" to id,
+                    "name" to id,
+                )
+            }
+            val entry = linkedMapOf<String, Any>(
                 "name" to custom.label,
                 "baseUrl" to custom.baseUrl,
                 "api" to custom.api,
                 "apiKey" to "\$${custom.envVar}",
             )
+            if (models.isNotEmpty()) entry["models"] = models
+            providers[custom.id] = entry
         }
         modelsJson.parentFile?.mkdirs()
         val root = linkedMapOf<String, Any>(
