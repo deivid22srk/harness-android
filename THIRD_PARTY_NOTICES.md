@@ -30,6 +30,13 @@ código-fonte correspondente do PRoot conforme a GPL-2.0.
 - Pacote: `@earendil-works/pi-coding-agent`
 - Licença: MIT.
 
+## JetBrains Mono (SIL Open Font License 1.1)
+
+- https://www.jetbrains.com/lp/mono/ · https://github.com/JetBrains/JetBrainsMono
+- Fonte monoespaçada embarcada em `res/font/` (`jetbrainsmono_*.ttf`), v2.304.
+- Licença: SIL Open Font License, Version 1.1 — texto completo em
+  `docs/OFL-JetBrainsMono.txt`.
+
 ## Node.js (MIT, com componentes de terceiros)
 
 - https://nodejs.org/ — instalado dentro do Alpine.

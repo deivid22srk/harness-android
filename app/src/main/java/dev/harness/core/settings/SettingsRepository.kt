@@ -79,6 +79,16 @@ class SettingsRepository(context: Context) {
         get() = prefs.getString(KEY_THEME, "system") ?: "system"
         set(v) = prefs.edit().putString(KEY_THEME, v).apply()
 
+    /** Material You dynamic palette (API 31+); falls back to brand colors. */
+    var dynamicColor: Boolean
+        get() = prefs.getBoolean(KEY_DYNAMIC, false)
+        set(v) = prefs.edit().putBoolean(KEY_DYNAMIC, v).apply()
+
+    /** User font-size multiplier applied on top of the system font scale. */
+    var fontScale: Float
+        get() = prefs.getFloat(KEY_FONT_SCALE, 1f)
+        set(v) = prefs.edit().putFloat(KEY_FONT_SCALE, v).apply()
+
     var onboardingDone: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
         set(v) = prefs.edit().putBoolean(KEY_ONBOARDED, v).apply()
@@ -192,6 +202,8 @@ class SettingsRepository(context: Context) {
         const val KEY_MODEL = "model"
         const val KEY_THINKING = "thinking"
         const val KEY_THEME = "theme"
+        const val KEY_DYNAMIC = "dynamic_color"
+        const val KEY_FONT_SCALE = "font_scale"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_BATTERY_PROMPT = "battery_prompt_shown"
         const val KEY_CUSTOM_PROVIDERS = "custom_providers"
