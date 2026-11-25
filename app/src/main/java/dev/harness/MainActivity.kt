@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -44,7 +45,7 @@ class MainActivity : ComponentActivity() {
                         uri.lastPathSegment?.let { section ->
                             runCatching {
                                 viewModel.openSettingsSection(
-                                    dev.harness.HarnessViewModel.SettingsSection.valueOf(section.uppercase()),
+                                    dev.harness.SettingsSection.valueOf(section.uppercase()),
                                 )
                             }
                         }

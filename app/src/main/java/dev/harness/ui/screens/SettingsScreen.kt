@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Session
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.harness.HarnessUiState
 import dev.harness.HarnessViewModel
+import dev.harness.SettingsSection
 import dev.harness.R
 import dev.harness.ui.components.HIconButton
 import dev.harness.ui.components.HSectionTitle
@@ -58,7 +59,7 @@ private val HUB_WIDTH = 360.dp
 
 /** One searchable entry of the settings hub. */
 private data class CategoryEntry(
-    val section: HarnessViewModel.SettingsSection,
+    val section: SettingsSection,
     val icon: ImageVector,
     val title: String,
     val subtitle: String,
@@ -221,33 +222,33 @@ private fun HubList(
 private fun SectionContent(
     uiState: HarnessUiState,
     viewModel: HarnessViewModel,
-    section: HarnessViewModel.SettingsSection?,
+    section: SettingsSection?,
 ) {
     when (section) {
-        HarnessViewModel.SettingsSection.Account -> AccountSection(uiState, viewModel)
-        HarnessViewModel.SettingsSection.Appearance -> AppearanceSection(uiState, viewModel)
-        HarnessViewModel.SettingsSection.Chat -> ChatSection(uiState, viewModel)
-        HarnessViewModel.SettingsSection.Sessions -> SessionsSection(uiState, viewModel)
-        HarnessViewModel.SettingsSection.Environment -> EnvironmentSection(uiState, viewModel)
-        HarnessViewModel.SettingsSection.Privacy -> PrivacySection(uiState, viewModel)
-        HarnessViewModel.SettingsSection.Diagnostics -> DiagnosticsSection(uiState, viewModel)
-        HarnessViewModel.SettingsSection.About -> AboutSection()
+        SettingsSection.Account -> AccountSection(uiState, viewModel)
+        SettingsSection.Appearance -> AppearanceSection(uiState, viewModel)
+        SettingsSection.Chat -> ChatSection(uiState, viewModel)
+        SettingsSection.Sessions -> SessionsSection(uiState, viewModel)
+        SettingsSection.Environment -> EnvironmentSection(uiState, viewModel)
+        SettingsSection.Privacy -> PrivacySection(uiState, viewModel)
+        SettingsSection.Diagnostics -> DiagnosticsSection(uiState, viewModel)
+        SettingsSection.About -> AboutSection()
         else -> Unit
     }
 }
 
 @Composable
-private fun sectionTitle(section: HarnessViewModel.SettingsSection?): String = stringResource(
+private fun sectionTitle(section: SettingsSection?): String = stringResource(
     when (section) {
-        HarnessViewModel.SettingsSection.Account -> R.string.settings_cat_account
-        HarnessViewModel.SettingsSection.Appearance -> R.string.settings_cat_appearance
-        HarnessViewModel.SettingsSection.Chat -> R.string.settings_cat_chat
-        HarnessViewModel.SettingsSection.Sessions -> R.string.settings_cat_sessions
-        HarnessViewModel.SettingsSection.Packages -> R.string.settings_cat_packages
-        HarnessViewModel.SettingsSection.Environment -> R.string.settings_cat_environment
-        HarnessViewModel.SettingsSection.Privacy -> R.string.settings_cat_privacy
-        HarnessViewModel.SettingsSection.Diagnostics -> R.string.settings_cat_diagnostics
-        HarnessViewModel.SettingsSection.About -> R.string.settings_cat_about
+        SettingsSection.Account -> R.string.settings_cat_account
+        SettingsSection.Appearance -> R.string.settings_cat_appearance
+        SettingsSection.Chat -> R.string.settings_cat_chat
+        SettingsSection.Sessions -> R.string.settings_cat_sessions
+        SettingsSection.Packages -> R.string.settings_cat_packages
+        SettingsSection.Environment -> R.string.settings_cat_environment
+        SettingsSection.Privacy -> R.string.settings_cat_privacy
+        SettingsSection.Diagnostics -> R.string.settings_cat_diagnostics
+        SettingsSection.About -> R.string.settings_cat_about
         null -> R.string.settings_title
     },
 )
@@ -301,14 +302,14 @@ private fun rememberSettingsEntries(
 
     return remember(accountSub, appearanceSub, chatSub, sessionsSub) {
         listOf(
-            CategoryEntry(HarnessViewModel.SettingsSection.Account, Icons.Default.Person, accountTitle, accountSub),
-            CategoryEntry(HarnessViewModel.SettingsSection.Appearance, Icons.Default.Palette, appearanceTitle, appearanceSub),
-            CategoryEntry(HarnessViewModel.SettingsSection.Chat, Icons.Default.Message, chatTitle, chatSub),
-            CategoryEntry(HarnessViewModel.SettingsSection.Sessions, Icons.Default.Session, sessionsTitle, sessionsSub),
-            CategoryEntry(HarnessViewModel.SettingsSection.Environment, Icons.Default.Memory, envTitle, envSub),
-            CategoryEntry(HarnessViewModel.SettingsSection.Privacy, Icons.Default.Lock, privacyTitle, privacySub),
-            CategoryEntry(HarnessViewModel.SettingsSection.Diagnostics, Icons.Default.BugReport, diagTitle, diagSub),
-            CategoryEntry(HarnessViewModel.SettingsSection.About, Icons.Default.Info, aboutTitle, aboutSub),
+            CategoryEntry(SettingsSection.Account, Icons.Default.Person, accountTitle, accountSub),
+            CategoryEntry(SettingsSection.Appearance, Icons.Default.Palette, appearanceTitle, appearanceSub),
+            CategoryEntry(SettingsSection.Chat, Icons.Default.Message, chatTitle, chatSub),
+            CategoryEntry(SettingsSection.Sessions, Icons.Default.History, sessionsTitle, sessionsSub),
+            CategoryEntry(SettingsSection.Environment, Icons.Default.Memory, envTitle, envSub),
+            CategoryEntry(SettingsSection.Privacy, Icons.Default.Lock, privacyTitle, privacySub),
+            CategoryEntry(SettingsSection.Diagnostics, Icons.Default.BugReport, diagTitle, diagSub),
+            CategoryEntry(SettingsSection.About, Icons.Default.Info, aboutTitle, aboutSub),
         )
     }
 }
