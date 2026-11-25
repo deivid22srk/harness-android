@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -498,11 +500,11 @@ fun ModelsDialog(
                             HButton(stringResource(R.string.models_clear), { onSelectAll(false) }, variant = HButtonDefaults.Variant.Ghost)
                         }
                         Spacer(Modifier.height(Space.xs))
-                        androidx.compose.foundation.lazy.LazyColumn(
+                        LazyColumn(
                             Modifier.fillMaxWidth().heightIn(max = 420.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            androidx.compose.foundation.lazy.items(models, key = { it.qualifiedId }) { option ->
+                            items(models, key = { it.qualifiedId }) { option ->
                                 ModelRow(option) { onToggle(option.qualifiedId) }
                             }
                         }
@@ -605,7 +607,7 @@ private fun AddCustomProviderDialog(
                             unfocusedBorderColor = colors.borderStrong,
                         ),
                     )
-                    androidx.compose.material3.ExposedDropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = apiExpanded,
                         onDismissRequest = { apiExpanded = false },
                     ) {

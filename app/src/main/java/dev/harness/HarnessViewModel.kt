@@ -382,6 +382,10 @@ class HarnessViewModel(private val app: Application) : ViewModel() {
         viewModelScope.launch { container.session.sendPrompt(prompt) }
     }
 
+    /** Last prompt for the UI to decide whether "Regenerar" is offered. */
+    fun lastPromptForRegeneration(): String? =
+        lastPrompt?.takeIf { !_ui.value.chat.isBusy }
+
     fun newSession() {
         viewModelScope.launch {
             container.session.newSession()
