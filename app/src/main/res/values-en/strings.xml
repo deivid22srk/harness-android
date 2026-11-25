@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Harness</string>
 
+    <!-- Onboarding -->
     <string name="onboarding_title">Harness</string>
     <string name="onboarding_subtitle">Setting up your coding environment</string>
     <string name="onboarding_step_check">Checking environment</string>
@@ -20,12 +21,37 @@
     <string name="onboarding_eta_minutes">%1$dmin</string>
     <string name="onboarding_progress_format">%1$d%%</string>
 
+    <!-- Connection -->
     <string name="conn_connected">connected</string>
     <string name="conn_starting">starting</string>
+    <string name="conn_no_provider">no provider</string>
     <string name="conn_restarting">restarting</string>
     <string name="conn_stopped">stopped</string>
     <string name="conn_failed">failed</string>
 
+    <!-- Sem provedor (banner) -->
+    <string name="no_provider_title">No provider configured</string>
+    <string name="no_provider_body">The agent is connected. To chat with the model, add a provider key — nothing else is blocked.</string>
+    <string name="no_provider_cta">Configure provider</string>
+
+    <!-- Sheet de conexão -->
+    <string name="conn_sheet_title">Connection</string>
+    <string name="conn_sheet_state">State</string>
+    <string name="conn_sheet_version">Pi version</string>
+    <string name="conn_sheet_uptime">Uptime</string>
+    <string name="conn_sheet_stderr_title">Diagnostic output (stderr)</string>
+    <string name="conn_sheet_test">Test provider</string>
+    <string name="conn_sheet_restart">Restart Pi</string>
+
+    <!-- Teste de provedor (sem gastar tokens) -->
+    <string name="diag_test_pi_ok">The agent is running and answered the RPC call.</string>
+    <string name="diag_test_pi_down">The agent is NOT running (state: %1$s). Use "Restart Pi".</string>
+    <string name="diag_test_key_ok">Key present for "%1$s" — it will be applied on the next start (the current one restarts automatically).</string>
+    <string name="diag_test_key_missing">No key configured for "%1$s". Set it up in Providers to chat with the model.</string>
+    <string name="diag_test_model_ok">Selected model: %1$s.</string>
+    <string name="diag_test_model_missing">No model selected yet.</string>
+
+    <!-- Chat -->
     <string name="chat_input_hint">Message</string>
     <string name="chat_send">Send</string>
     <string name="chat_stop">Stop</string>
@@ -40,12 +66,14 @@
     <string name="chat_connection_retry">Try again</string>
     <string name="chat_user_images">%1$d image(s)</string>
 
+    <!-- Agent status -->
     <string name="busy_waiting_model">Thinking…</string>
     <string name="busy_streaming">Writing…</string>
     <string name="busy_running_tools">Running…</string>
     <string name="busy_compacting">Compacting context…</string>
     <string name="busy_retrying">Retrying…</string>
 
+    <!-- Tool calls -->
     <string name="tool_group_running">Running %1$d tool(s)…</string>
     <string name="tool_group_done">Used %1$d tool(s)</string>
     <string name="tool_status_running">running</string>
@@ -54,12 +82,14 @@
     <string name="tool_status_cancelled">cancelled</string>
     <string name="reasoning_label">Reasoning</string>
 
+    <!-- Message actions -->
     <string name="msg_copy">Copy</string>
     <string name="msg_copied">Copied</string>
     <string name="msg_copy_desc">Copy message</string>
     <string name="msg_regenerate">Regenerate</string>
     <string name="msg_edit_resend">Edit and resend</string>
 
+    <!-- Composer -->
     <string name="composer_attach">Attach image</string>
     <string name="composer_model_chip">Model</string>
     <string name="composer_thinking_chip">Reasoning</string>
@@ -82,6 +112,7 @@
     <string name="thinking_chip_fallback">Reasoning</string>
     <string name="queue_steering_label">Queued: %1$d message(s)</string>
 
+    <!-- Attach sheet -->
     <string name="attach_sheet_title">Attach image</string>
     <string name="attach_sheet_pick">Choose photo…</string>
     <string name="attach_sheet_note">Images are sent with your next message.</string>
@@ -89,10 +120,12 @@
     <string name="attach_remove">Remove</string>
     <string name="notice_attach_failed">Could not load the image.</string>
 
+    <!-- Pickers -->
     <string name="model_picker_title">Model</string>
     <string name="model_picker_empty">No models available. Use Settings → Get models.</string>
     <string name="thinking_picker_title">Reasoning</string>
 
+    <!-- Models dialog -->
     <string name="models_title">Models — %1$s</string>
     <string name="models_selected_count">%1$d of %2$d selected</string>
     <string name="models_loading">Fetching models…</string>
@@ -102,6 +135,7 @@
     <string name="models_clear">Clear</string>
     <string name="models_save">Save</string>
 
+    <!-- Projects -->
     <string name="projects_title">Projects</string>
     <string name="projects_subtitle">Choose where the agent will work</string>
     <string name="projects_search_hint">Search projects</string>
@@ -131,6 +165,7 @@
     <string name="notice_project_deleted">Project “%1$s” deleted.</string>
     <string name="projects_undo">Undo</string>
 
+    <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_section_provider">AI provider</string>
@@ -173,6 +208,7 @@
     <string name="settings_licenses_text">This app uses PRoot (GPL-2.0), Alpine Linux, JetBrains Mono (OFL) and Pi (MIT). See THIRD_PARTY_NOTICES.md in the repository.</string>
     <string name="provider_remove">Remove</string>
 
+    <!-- Custom provider dialog -->
     <string name="provider_custom_title">Custom provider</string>
     <string name="provider_custom_id">identifier</string>
     <string name="provider_custom_name">name</string>
@@ -183,6 +219,7 @@
     <string name="provider_custom_note">Pi requires at least one model per provider. Enter the IDs the endpoint exposes.</string>
     <string name="provider_custom_add">Add</string>
 
+    <!-- Generic -->
     <string name="a11y_more_options">More options</string>
     <string name="code_language_fallback">code</string>
     <string name="action_cancel">Cancel</string>
@@ -190,8 +227,177 @@
     <string name="action_confirm">Confirm</string>
     <string name="action_copy">Copy</string>
     <string name="action_send">Send</string>
+    <string name="action_retry">Try again</string>
     <string name="a11y_back">Back</string>
     <string name="a11y_expand">Expand %1$s</string>
     <string name="a11y_collapse">Collapse %1$s</string>
     <string name="a11y_open_settings">Open settings</string>
+    <string name="a11y_open_sessions">View sessions</string>
+
+    <!-- Sessions -->
+    <string name="sessions_title">Project sessions</string>
+    <string name="sessions_search_hint">Search sessions</string>
+    <string name="sessions_new">New session</string>
+    <string name="sessions_active">Active</string>
+    <string name="sessions_untitled">Untitled</string>
+    <string name="sessions_rename">Rename</string>
+    <string name="sessions_rename_title">Rename session</string>
+    <string name="sessions_rename_label">Session name</string>
+    <string name="sessions_duplicate">Duplicate</string>
+    <string name="sessions_delete">Delete</string>
+    <string name="sessions_delete_title">Delete session?</string>
+    <string name="sessions_delete_body">Session "%1$s" and its entire history will be erased. This cannot be undone after the notice is closed.</string>
+    <string name="sessions_deleted_snackbar">Session "%1$s" deleted</string>
+    <string name="sessions_undo">Undo</string>
+    <string name="sessions_actions_a11y">Actions for session %1$s</string>
+    <string name="sessions_message_count">%1$d messages</string>
+    <string name="sessions_empty_title">No sessions yet</string>
+    <string name="sessions_empty_body">Chat with the agent to create the first session. Each project keeps its own sessions, with the full history.</string>
+    <string name="sessions_search_empty_title">Nothing found</string>
+    <string name="sessions_search_empty_body">No session matches the search.</string>
+    <string name="sessions_error_title">Could not read sessions</string>
+    <string name="sessions_resume_failed">Could not resume the last session; a new session was opened.</string>
+    <string name="sessions_rename_needs_agent">Connect to the project to rename the active session.</string>
+
+    <!-- Settings hub + categories -->
+    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_search_miss">No setting matches the search.</string>
+    <string name="settings_cat_account">Account &amp; provider</string>
+    <string name="settings_cat_appearance">Appearance</string>
+    <string name="settings_cat_chat">Chat</string>
+    <string name="settings_cat_sessions">Projects &amp; sessions</string>
+    <string name="settings_cat_packages">Pi packages</string>
+    <string name="settings_cat_environment">Environment</string>
+    <string name="settings_cat_privacy">Privacy &amp; security</string>
+    <string name="settings_cat_diagnostics">Diagnostics</string>
+    <string name="settings_cat_about">About</string>
+    <string name="settings_hub_account_ok">API key configured</string>
+    <string name="settings_hub_account_missing">API key not configured</string>
+    <string name="settings_hub_appearance_subtitle">Theme: %1$s</string>
+    <string name="settings_hub_chat_subtitle">%1$d of 4 options enabled</string>
+    <string name="settings_hub_resume_on">Resume last session: on</string>
+    <string name="settings_hub_resume_off">Resume last session: off</string>
+    <string name="settings_hub_environment_subtitle">Alpine, Node and Pi versions</string>
+    <string name="settings_hub_privacy_subtitle">Key encrypted in the Keystore</string>
+    <string name="settings_hub_diagnostics_subtitle">Logs, copy and environment test</string>
+    <string name="settings_hub_about_subtitle">Version, licenses and links</string>
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_subtitle">Choose between system, light or dark theme</string>
+    <string name="settings_chat_autoscroll">Auto-scroll</string>
+    <string name="settings_chat_autoscroll_note">Follows the response while it is generated. Scrolling up stops the follow-up.</string>
+    <string name="settings_chat_markdown">Render markdown</string>
+    <string name="settings_chat_markdown_note">When off, replies appear as plain text.</string>
+    <string name="settings_chat_enter">Send with Enter</string>
+    <string name="settings_chat_enter_note">The keyboard action sends the message instead of adding a new line.</string>
+    <string name="settings_chat_haptic">Haptic on send</string>
+    <string name="settings_chat_haptic_note">Short tactile feedback when a message is sent.</string>
+    <string name="settings_sessions_resume">Resume last session</string>
+    <string name="settings_sessions_resume_note">When opening a project, continues from the most recent session with the full history. When off, the app shows the session list.</string>
+    <string name="settings_sessions_storage">Storage usage</string>
+    <string name="settings_storage_env">Environment (Alpine and tools)</string>
+    <string name="settings_storage_sessions">Pi sessions</string>
+    <string name="settings_storage_projects">Projects</string>
+    <string name="settings_storage_total">Total</string>
+    <string name="settings_sessions_storage_loading">Calculating usage…</string>
+    <string name="settings_sessions_source_note">Sessions live in files written by Pi itself; the app never keeps a parallel copy of the history.</string>
+    <string name="settings_env_version">Provisioned environment version</string>
+    <string name="settings_env_connection">Connection state</string>
+    <string name="settings_reinstall_action">Reinstall</string>
+    <string name="settings_privacy_key_storage">Where the key is stored</string>
+    <string name="settings_privacy_key_storage_value">Android Keystore</string>
+    <string name="settings_privacy_key_storage_note">AES-256-GCM with a hardware-backed key; injected as an environment variable into Pi, never written to disk by the app.</string>
+    <string name="settings_privacy_keys_configured">Providers with a configured key</string>
+    <string name="settings_privacy_note">The app does not send usage data to any server. Communication happens only between the app, the chosen AI provider and the npm registry (tool and package installs).</string>
+    <string name="settings_privacy_danger">Destructive actions</string>
+    <string name="settings_privacy_clear">Erase data</string>
+    <string name="settings_privacy_clear_note">Removes the environment, projects and sessions. API keys are kept.</string>
+    <string name="settings_privacy_clear_action">Erase</string>
+    <string name="settings_privacy_clear_confirm_title">Erase all data?</string>
+    <string name="settings_privacy_clear_confirm_text">The environment (Alpine, Node, Pi), projects and session history will be removed. API keys, encrypted in the Keystore, are kept.</string>
+    <string name="settings_env_update">Update Pi</string>
+    <string name="settings_env_update_action">Update now</string>
+    <string name="settings_env_update_confirm_title">Update Pi?</string>
+    <string name="settings_env_update_confirm_text">Runs "pi update", which upgrades Pi itself to the latest version. The current session continues; restart afterwards to use the new version. This action does not change packages.</string>
+    <string name="settings_env_update_busy">The agent is generating a response. Stop it before updating Pi.</string>
+    <string name="settings_env_update_done">Pi updated. Restart the session to use the new version.</string>
+    <string name="settings_env_update_failed">The Pi update failed; see the log in this category.</string>
+    <string name="settings_sessions_clear_old">Erase old sessions</string>
+    <string name="settings_sessions_clear_old_note">Keeps the 10 most recent sessions of the active project and erases the rest. The active session is never erased.</string>
+    <string name="settings_sessions_clear_old_action">Erase old ones</string>
+    <string name="settings_sessions_clear_old_title">Erase old sessions?</string>
+    <string name="settings_sessions_clear_old_text">All project sessions except the 10 most recent will be deleted. The active session is preserved even if it is outside the cutoff.</string>
+    <string name="sessions_cleared">%1$d old sessions erased.</string>
+    <string name="sessions_cleared_none">No old sessions to erase.</string>
+    <string name="settings_chat_steering">Queued message delivery (steering)</string>
+    <string name="settings_chat_steering_note">How messages sent during a response are delivered to the agent.</string>
+    <string name="settings_chat_followup_note">How follow-ups sent during a response are delivered when it ends.</string>
+    <string name="settings_chat_followup">Follow-up delivery</string>
+    <string name="settings_queue_all">All together</string>
+    <string name="settings_queue_one">One at a time</string>
+    <string name="settings_diag_test">Environment test</string>
+    <string name="settings_diag_test_run">Test environment</string>
+    <string name="settings_diag_test_provider">Test provider connection</string>
+    <string name="settings_about_version_label">Version</string>
+    <string name="settings_about_runtime">Runtime</string>
+    <string name="settings_about_runtime_value">Alpine → Node → Pi (RPC) under PRoot</string>
+    <string name="settings_about_links">Links</string>
+    <string name="settings_hub_packages_subtitle">Install, list, remove and update</string>
+    <string name="settings_hub_packages_count">%1$d package(s) installed</string>
+
+    <!-- Pi Packages (Frente C) -->
+    <string name="packages_subtitle">Agent packages: extensions, skills, prompts and themes</string>
+    <string name="packages_global_title">Global</string>
+    <string name="packages_project_title">From this project</string>
+    <string name="packages_empty_global">No global packages installed.</string>
+    <string name="packages_empty_project">No packages installed in this project.</string>
+    <string name="packages_install_title">Install package</string>
+    <string name="packages_source_label">Package source</string>
+    <string name="packages_source_hint">Formats: npm:name@version, git:github.com/user/repo@ref, https:// URL or local path</string>
+    <string name="packages_scope">Scope</string>
+    <string name="packages_scope_global">Global (all projects)</string>
+    <string name="packages_scope_project">This project (.pi/settings.json)</string>
+    <string name="packages_install_action">Install</string>
+    <string name="packages_explore_title">Explore</string>
+    <string name="packages_explore_note">Searches the npm registry (keyword pi-package). Results come from npm and may differ from the pi.dev gallery. Tap a card to fill in the source.</string>
+    <string name="packages_search_label">Search npm</string>
+    <string name="packages_search_action">Search</string>
+    <string name="packages_use">Use</string>
+    <string name="packages_load_more">Load more</string>
+    <string name="packages_result_count">%1$d result(s)</string>
+    <string name="packages_log_title">Command output</string>
+    <string name="packages_log_empty">(no output)</string>
+    <string name="packages_running">Running…</string>
+    <string name="packages_log_done_install">Install finished (code %1$d)</string>
+    <string name="packages_log_done_remove">Removal finished (code %1$d)</string>
+    <string name="packages_log_done_update">Update finished (code %1$d)</string>
+    <string name="packages_cancel">Cancel</string>
+    <string name="packages_error_details">Technical details</string>
+    <string name="packages_op_error_title">The operation failed</string>
+    <string name="packages_error_title">Could not read packages</string>
+    <string name="packages_update_all_a11y">Update all packages</string>
+    <string name="packages_update_one_a11y">Update %1$s</string>
+    <string name="packages_remove_a11y">Remove %1$s</string>
+    <string name="packages_kind_a11y">Source %1$s</string>
+    <string name="packages_pinned">Pinned</string>
+    <string name="packages_feature_extensions">extensions</string>
+    <string name="packages_feature_skills">skills</string>
+    <string name="packages_feature_prompts">prompts</string>
+    <string name="packages_feature_themes">themes</string>
+    <string name="packages_security_title">Install package?</string>
+    <string name="packages_security_body">The package "%1$s" can run code with Pi's permissions and influence the agent's behavior. Review its source before installing.</string>
+    <string name="packages_security_note">Third-party packages run code in your environment. Pi only loads new extensions after restarting the session.</string>
+    <string name="packages_security_confirm">I trust it and want to install</string>
+    <string name="packages_remove_title">Remove package?</string>
+    <string name="packages_remove_body">The package "%1$s" will be removed from the settings and from the install directory.</string>
+    <string name="packages_reload_title">Restart Pi?</string>
+    <string name="packages_reload_body">Extensions and skills are only loaded when Pi starts. Restart the session to apply the changes — the current history will be preserved.</string>
+    <string name="packages_reload_now">Restart session now</string>
+
+    <string name="sessions_result_count">%1$d session(s) found</string>
+
+    <string name="time_now">now</string>
+    <string name="time_minutes">%1$d min ago</string>
+    <string name="time_hours">%1$d h ago</string>
+    <string name="time_days">%1$d d ago</string>
+    <string name="time_months">%1$d months ago</string>
 </resources>
