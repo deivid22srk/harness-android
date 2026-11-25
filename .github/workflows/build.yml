@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main, ui-redesign, feat/settings-sessions-packages]
+    branches: [main, ui-redesign, feat/settings-sessions-packages, fix/connection-chat-packages-visual]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -95,6 +95,47 @@ jobs:
           docker run --rm --platform linux/arm64 \
             -v "$PWD/scripts:/scripts:ro" \
             alpine:3.24 /bin/sh /scripts/smoke-test.sh "${{ env.PI_VERSION }}"
+
+  # ---------------------------------------------------------------------------
+  # Renderiza as telas na JVM (Roborazzi + Robolectric) e publica os PNGs como
+  # artifact `ui-screenshots` — evidência visual para o Crítico (PROMPT §8).
+  # Não precisa de emulador nem do PRoot: os cenários usam fixtures.
+  # ---------------------------------------------------------------------------
+  screenshots:
+    name: UI screenshots (Roborazzi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'cmdline-tools;latest platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Render screenshots (escuro/claro × fonte 1.0/1.3)
+        env:
+          HARNESS_SCREENSHOTS: '1'
+          HARNESS_SCREENSHOTS_DIR: ${{ github.workspace }}/app/build/screenshots
+        run: ./gradlew --no-daemon testDebugUnitTest --tests "dev.harness.ui.screenshots.UiScreenshotsTest"
+
+      - name: List screenshots
+        run: ls -la app/build/screenshots
+
+      - name: Upload screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: app/build/screenshots/*.png
+          if-no-files-found: error
 
   # ---------------------------------------------------------------------------
   # Builds the signed release APK.

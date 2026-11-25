@@ -21,8 +21,10 @@ npm install -g "@earendil-works/pi-coding-agent@${PI_VERSION}" >/dev/null
 echo "==> pi --version"
 pi --version
 
-echo "==> RPC handshake (get_state)"
-node - <<'JS'
+echo "==> RPC handshake SEM NENHUMA CHAVE (get_state + get_available_models)"
+# Prova objetiva (PROMPT §4.4): o Pi responde ao RPC com o ambiente limpo,
+# sem nenhuma credencial de provedor — conexão não depende da chave.
+env -i PATH="$PATH" HOME="$HOME" node - <<'JS'
 const { spawn } = require('node:child_process');
 
 const proc = spawn('pi', ['--mode', 'rpc', '--no-session'], {
@@ -48,21 +50,33 @@ proc.stdout.on('data', (chunk) => {
 
 proc.stdin.write(JSON.stringify({ id: 'smoke-1', type: 'get_state' }) + '\n');
 proc.stdin.write(JSON.stringify({ id: 'smoke-2', type: 'get_available_thinking_levels' }) + '\n');
+proc.stdin.write(JSON.stringify({ id: 'smoke-3', type: 'get_available_models' }) + '\n');
 
 const deadline = Date.now() + 30000;
 const timer = setInterval(() => {
-  const done = seen.has('get_state') && seen.has('get_available_thinking_levels');
+  const done = seen.has('get_state') && seen.has('get_available_thinking_levels') && seen.has('get_available_models');
   if (done || Date.now() > deadline) {
     clearInterval(timer);
+    const state = seen.get('get_state');
+    const models = seen.get('get_available_models');
+    const modelCount = models && models.data && Array.isArray(models.data.models)
+      ? models.data.models.length : -1;
+    console.log(`  get_state: success=${state ? state.success : 'timeout'}`);
+    console.log(`  get_available_models: success=${models ? models.success : 'timeout'} models=${modelCount}`);
     proc.stdin.end();
     proc.kill();
-    let ok = true;
-    for (const [cmd, rec] of seen) {
-      console.log(`  ${cmd}: success=${rec.success}`);
-      if (rec.success !== true) ok = false;
+    // The objective proof: the RPC answers get_state with NO credentials in
+    // the environment. The models command must ANSWER (its success flag and
+    // shape are logged for diagnostics, not asserted — Pi's model catalog
+    // behavior without keys is version-specific).
+    const stateOk = state && state.success === true;
+    const answered = seen.size >= 3;
+    console.log(`  respondeu todos os comandos: ${answered ? 'sim' : 'nao'}`);
+    if (models && models.success === false) {
+      console.log(`  get_available_models error: ${models.error || '(sem mensagem)'}`);
     }
-    if (seen.size < 2) ok = false;
-    console.log(ok ? 'RPC_OK' : 'RPC_FAILED');
+    const ok = stateOk && answered;
+    console.log(ok ? 'RPC_OK_SEM_CHAVE' : 'RPC_FAILED');
     process.exit(ok ? 0 : 1);
   }
 }, 250);

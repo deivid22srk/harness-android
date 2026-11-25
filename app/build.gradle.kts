@@ -91,7 +91,8 @@ android {
     }
 
     testOptions {
-        unitTests.isIncludeAndroidResources = false
+        // Robolectric (AgentSessionTest + Roborazzi screenshots) needs resources.
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -125,4 +126,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // JVM rendering: AgentSessionTest (processo falso) + screenshots Roborazzi.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.androidx.test.core)
 }
