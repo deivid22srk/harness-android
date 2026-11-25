@@ -21,6 +21,8 @@ import dev.harness.ui.components.ToolCallCard
 import dev.harness.ui.components.DiffView
 import dev.harness.ui.theme.HarnessThemeProvider
 import dev.harness.ui.theme.Space
+import dev.harness.ui.screens.InstalledPackagesSection
+import dev.harness.ui.screens.NoProviderBanner
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner

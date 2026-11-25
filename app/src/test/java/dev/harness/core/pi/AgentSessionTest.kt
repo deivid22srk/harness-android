@@ -144,10 +144,10 @@ class AgentSessionTest {
         }
 
         override fun exitValue(): Int = if (killed) 137 else throw IllegalThreadStateException()
-        // PiProcessHandle surface. `isAlive` is satisfied by the inherited
-        // Process#isAlive() (throws exitValue → false while running, true
-        // after destroy). Only `process` needs an explicit override.
+        // PiProcessHandle surface: `process` and `isAlive` are explicit
+        // overrides (Kotlin val != inherited Java isAlive()).
         override val process: Process? get() = this
+        override val isAlive: Boolean get() = !killed
         override fun destroy() {
             killed = true
             synchronized(lock) { lock.notifyAll() }
@@ -156,7 +156,7 @@ class AgentSessionTest {
             runCatching { sessionToShellIn.close() }
         }
 
-        override fun destroyForcibly(): Process = destroy()
+        override fun destroyForcibly(): Process = this.also { destroy() }
     }
 
     private class FakeFactory : (PiLaunchConfig) -> PiProcessHandle {
@@ -208,7 +208,7 @@ class AgentSessionTest {
         }
     }
 
-    private fun awaitConnection(
+    private suspend fun awaitConnection(
         session: AgentSession,
         expected: ConnectionState,
         timeoutMs: Long = 5000,
