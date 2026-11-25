@@ -61,7 +61,8 @@ echo "==> libandroid-shmem"
 git clone --depth 1 --branch "$SHMEM_REF" https://github.com/termux/libandroid-shmem.git "$WORK/shmem"
 (
     cd "$WORK/shmem"
-    "$CC" -static -fPIC -O2 -c shmem.c -o shmem.o
+    # Android's <paths.h> does not define _PATH_TMP; provide it for the shim.
+    "$CC" -static -fPIC -O2 -D_PATH_TMP='"/tmp/"' -c shmem.c -o shmem.o
     "$AR" rcs libandroid-shmem.a shmem.o
     cp shmem.h "$WORK/sysroot/include/"
     cp libandroid-shmem.a "$WORK/sysroot/lib/"
