@@ -41,7 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -139,6 +141,20 @@ fun SessionsScreen(
                     .padding(horizontal = Space.lg, vertical = Space.xs)
                     .testTag("sessions_new"),
             )
+
+            // TalkBack: announce the number of results as the search changes.
+            if (sessionsState.query.isNotBlank()) {
+                Text(
+                    stringResource(R.string.sessions_result_count, sessionsState.visibleSessions.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HarnessTheme.textTertiary,
+                    modifier = Modifier
+                        .padding(horizontal = Space.lg, vertical = Space.xs)
+                        .semantics {
+                            liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite
+                        },
+                )
+            }
 
             when {
                 sessionsState.loading && sessionsState.sessions.isEmpty() -> SkeletonList()

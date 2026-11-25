@@ -339,6 +339,7 @@
     <string name="packages_search_action">Buscar</string>
     <string name="packages_use">Usar</string>
     <string name="packages_load_more">Carregar mais</string>
+    <string name="packages_result_count">%1$d resultado(s)</string>
     <string name="packages_log_title">Saída do comando</string>
     <string name="packages_log_empty">(sem saída)</string>
     <string name="packages_running">Executando…</string>
@@ -367,6 +368,8 @@
     <string name="packages_reload_title">Recarregar o Pi?</string>
     <string name="packages_reload_body">Extensões e skills só são carregadas quando o Pi inicia. Reinicie a sessão para aplicar as mudanças — o histórico atual será preservado.</string>
     <string name="packages_reload_now">Reiniciar sessão agora</string>
+
+    <string name="sessions_result_count">%1$d sessão(ões) encontrada(s)</string>
 
     <string name="time_now">agora</string>
     <string name="time_minutes">há %1$d min</string>

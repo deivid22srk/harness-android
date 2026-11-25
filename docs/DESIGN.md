@@ -265,3 +265,8 @@ Sessions (pref. desligada); Chat ↔ Sessions; back handles por tela
   de cada operação e após cancelamento (estado revalidado explícito).
 - Previews (escuro/claro/fonte grande) para `PackageRow` e `SessionRow`.
 - A11y: fundo do swipe com description dedicada ("Excluir <título>").
+
+## 14. Rodada 6 — a11y fino
+
+- Contagens de resultados com `LiveRegionMode.Polite` na busca de sessões e no
+  explorador de pacotes — TalkBack anuncia mudanças sem roubar o foco.

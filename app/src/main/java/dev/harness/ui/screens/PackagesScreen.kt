@@ -40,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -454,6 +456,14 @@ internal fun ExplorerSection(
     if (search.loading) {
         LoadingPackages()
     } else {
+        Text(
+            stringResource(R.string.packages_result_count, search.results.size),
+            style = MaterialTheme.typography.bodySmall,
+            color = HarnessTheme.textTertiary,
+            modifier = Modifier.semantics {
+                liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite
+            },
+        )
         search.results.forEach { result ->
             SearchResultRow(
                 name = result.name,
