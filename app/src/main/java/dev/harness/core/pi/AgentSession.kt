@@ -200,6 +200,22 @@ class AgentSession(
         rpc?.call(buildJsonObject { put("type", "set_session_name"); put("name", name) })
     }
 
+    /**
+     * Asks the running Pi for its configured models (built-in catalog plus
+     * custom entries from models.json). Returns qualified `provider/id` pairs.
+     */
+    suspend fun listAvailableModels(): List<Pair<String, String>> {
+        val client = rpc ?: return emptyList()
+        val response = client.call(cmd("get_available_models"), timeoutMs = 20_000) ?: return emptyList()
+        val models = response.data?.get("models") as? JsonArray ?: return emptyList()
+        return models.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val provider = (obj["provider"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@mapNotNull null
+            val id = (obj["id"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@mapNotNull null
+            provider to id
+        }
+    }
+
     suspend fun refreshStats() {
         val resp = rpc?.call(cmd("get_session_stats"))
         val percent = resp?.data?.get("contextUsage")?.let { usage ->

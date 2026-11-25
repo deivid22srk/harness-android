@@ -13,6 +13,8 @@ data class PiLaunchConfig(
     val thinking: String? = null,
     val sessionName: String? = null,
     val useSession: Boolean = true,
+    /** Extra args for `--models` scope (see ModelCatalog.modelsScopeArg). */
+    val modelScope: List<String> = emptyList(),
     val extraArgs: List<String> = emptyList(),
     val apiKeys: Map<String, String> = emptyMap(),
 )
@@ -61,6 +63,7 @@ class PiProcess(
         config.model?.let { piArgs += listOf("--model", it) }
         config.thinking?.let { piArgs += listOf("--thinking", it) }
         config.sessionName?.let { piArgs += listOf("--name", it) }
+        piArgs += config.modelScope
         piArgs += config.extraArgs
 
         val guestEnv = HashMap<String, String>()

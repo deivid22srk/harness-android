@@ -6,6 +6,10 @@ import dev.harness.core.keys.SecretStore
 /**
  * Provider catalogue for the MVP: API-key authentication, injected as
  * environment variables into the Pi process (PROMPT §6).
+ *
+ * `api` values must be APIs Pi understands (`openai-completions`,
+ * `openai-responses`, `anthropic-messages`, `google-generative-ai`, …). See
+ * docs/pi/models-configuration.md.
  */
 data class Provider(
     val id: String,
@@ -13,6 +17,19 @@ data class Provider(
     val envVar: String,
     val keyHint: String,
     val defaultModel: String? = null,
+    /** Pi API id for custom endpoints; null for Pi's built-in providers. */
+    val api: String? = null,
+    /** Base URL for custom endpoints; null for Pi's built-in providers. */
+    val baseUrl: String? = null,
+)
+
+/** A user-defined provider stored in preferences. */
+data class CustomProvider(
+    val id: String,
+    val label: String,
+    val baseUrl: String,
+    val api: String,
+    val envVar: String,
 )
 
 object Providers {
@@ -26,6 +43,14 @@ object Providers {
         Provider("mistral", "Mistral", "MISTRAL_API_KEY", ""),
         Provider("cerebras", "Cerebras", "CEREBRAS_API_KEY", "csk-…"),
         Provider("deepseek", "DeepSeek", "DEEPSEEK_API_KEY", "sk-…"),
+    )
+
+    /** APIs Pi supports for a compatible endpoint. */
+    val APIS = listOf(
+        "openai-completions",
+        "openai-responses",
+        "anthropic-messages",
+        "google-generative-ai",
     )
 
     fun byId(id: String): Provider? = ALL.firstOrNull { it.id == id }
@@ -60,20 +85,90 @@ class SettingsRepository(context: Context) {
         get() = prefs.getBoolean(KEY_BATTERY_PROMPT, false)
         set(v) = prefs.edit().putBoolean(KEY_BATTERY_PROMPT, v).apply()
 
+    // ---------------------------------------------------------------------
+    // Custom providers
+    // ---------------------------------------------------------------------
+
+    /** All providers (built-in + custom), as seen by the settings UI. */
+    fun allProviders(): List<Provider> = Providers.ALL + customProviders().map { it.asProvider() }
+
+    fun providerById(id: String): Provider? = allProviders().firstOrNull { it.id == id }
+
+    fun customProviders(): List<CustomProvider> {
+        val raw = prefs.getString(KEY_CUSTOM_PROVIDERS, null) ?: return emptyList()
+        return decodeCustom(raw)
+    }
+
+    fun addCustomProvider(provider: CustomProvider) {
+        val list = customProviders().filterNot { it.id == provider.id } + provider
+        prefs.edit().putString(KEY_CUSTOM_PROVIDERS, encodeCustom(list)).apply()
+    }
+
+    fun removeCustomProvider(id: String) {
+        val list = customProviders().filterNot { it.id == id }
+        prefs.edit().putString(KEY_CUSTOM_PROVIDERS, encodeCustom(list)).apply()
+        secrets.put(envVarFor(id), "")
+    }
+
+    private fun envVarFor(id: String): String =
+        "HARNESS_KEY_" + id.uppercase().replace(Regex("[^A-Z0-9]"), "_")
+
+    private fun CustomProvider.asProvider() = Provider(
+        id = id,
+        label = label,
+        envVar = envVar,
+        keyHint = "chave do provedor",
+        api = api,
+        baseUrl = baseUrl,
+    )
+
+    private fun encodeCustom(list: List<CustomProvider>): String =
+        list.joinToString("\u0001") { "${it.id}\u0002${it.label}\u0002${it.baseUrl}\u0002${it.api}\u0002${it.envVar}" }
+
+    private fun decodeCustom(raw: String): List<CustomProvider> {
+        if (raw.isBlank()) return emptyList()
+        return raw.split('\u0001').mapNotNull { entry ->
+            val parts = entry.split('\u0002')
+            if (parts.size < 5) return@mapNotNull null
+            CustomProvider(parts[0], parts[1], parts[2], parts[3], parts[4])
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Selected models (per provider)
+    // ---------------------------------------------------------------------
+
+    /** Model IDs the user chose to keep for a provider; empty means "all". */
+    fun selectedModels(providerId: String): Set<String> {
+        val raw = prefs.getString(KEY_SELECTED_PREFIX + providerId, null) ?: return emptySet()
+        return raw.split('\n').filter { it.isNotBlank() }.toSet()
+    }
+
+    fun setSelectedModels(providerId: String, ids: Set<String>) {
+        prefs.edit().putString(KEY_SELECTED_PREFIX + providerId, ids.joinToString("\n")).apply()
+    }
+
+    fun hasModelSelection(providerId: String): Boolean =
+        prefs.contains(KEY_SELECTED_PREFIX + providerId)
+
+    // ---------------------------------------------------------------------
+    // API keys
+    // ---------------------------------------------------------------------
+
     fun apiKey(providerId: String): String? {
-        val p = Providers.byId(providerId) ?: return null
+        val p = providerById(providerId) ?: return null
         return secrets.get(p.envVar)
     }
 
     fun setApiKey(providerId: String, key: String) {
-        val p = Providers.byId(providerId) ?: return
+        val p = providerById(providerId) ?: return
         secrets.put(p.envVar, key.trim())
     }
 
-    /** Env map injected into Pi for the currently selected provider. */
+    /** Env map injected into Pi for every configured provider. */
     fun apiKeyEnv(): Map<String, String> {
         val out = HashMap<String, String>()
-        for (p in Providers.ALL) {
+        for (p in allProviders()) {
             secrets.get(p.envVar)?.takeIf { it.isNotBlank() }?.let { out[p.envVar] = it }
         }
         return out
@@ -88,5 +183,7 @@ class SettingsRepository(context: Context) {
         const val KEY_THEME = "theme"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_BATTERY_PROMPT = "battery_prompt_shown"
+        const val KEY_CUSTOM_PROVIDERS = "custom_providers"
+        const val KEY_SELECTED_PREFIX = "selected_models_"
     }
 }

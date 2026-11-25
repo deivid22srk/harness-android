@@ -40,10 +40,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.harness.core.pi.ConnectionState
 import dev.harness.core.rpc.ExtensionUiRequest
-import dev.harness.core.settings.Providers
 import dev.harness.ui.screens.ChatList
 import dev.harness.ui.screens.Composer
 import dev.harness.ui.screens.ModelPickerSheet
+import dev.harness.ui.screens.ModelsDialog
 import dev.harness.ui.screens.OnboardingScreen
 import dev.harness.ui.screens.ProjectsScreen
 import dev.harness.ui.screens.SettingsScreen
@@ -78,11 +78,15 @@ fun HarnessRoot(
             )
 
             Screen.Settings -> SettingsScreen(
+                providers = uiState.providers,
                 selectedProvider = uiState.selectedProvider,
                 thinkingLevel = uiState.thinkingLevel,
                 diagnostics = uiState.diagnostics,
-                onSelectProvider = { viewModel.saveApiKey(it, "") },
+                onSelectProvider = viewModel::selectProvider,
                 onSaveKey = viewModel::saveApiKey,
+                onAddCustomProvider = viewModel::addCustomProvider,
+                onRemoveCustomProvider = viewModel::removeCustomProvider,
+                onOpenModels = viewModel::openModelsDialog,
                 onClearEnvironment = viewModel::clearEnvironment,
                 onBack = viewModel::backToProjects,
             )
@@ -101,6 +105,20 @@ fun HarnessRoot(
                 },
             )
         }
+
+        uiState.modelsDialogProvider?.let { providerId ->
+            val label = uiState.providers.firstOrNull { it.id == providerId }?.label ?: providerId
+            ModelsDialog(
+                providerLabel = label,
+                loading = uiState.modelsLoading,
+                models = uiState.models,
+                error = uiState.modelsError,
+                onToggle = viewModel::toggleModel,
+                onSelectAll = viewModel::selectAllModels,
+                onSave = viewModel::saveModelSelection,
+                onDismiss = viewModel::closeModelsDialog,
+            )
+        }
     }
 }
 
@@ -108,8 +126,15 @@ fun HarnessRoot(
 @Composable
 private fun ChatScreen(uiState: HarnessUiState, viewModel: HarnessViewModel) {
     val colors = HarnessTheme
-    val models = remember {
-        Providers.ALL.mapNotNull { p -> p.defaultModel?.let { m -> p.id to m } }
+    // Only the models the user selected (or the provider's default) are offered.
+    val models = remember(uiState.selectedProvider, uiState.providers) {
+        val provider = uiState.providers.firstOrNull { it.id == uiState.selectedProvider }
+        val selected = viewModel.selectedModelsFor(uiState.selectedProvider)
+        when {
+            selected.isNotEmpty() -> selected.map { uiState.selectedProvider to it }
+            provider?.defaultModel != null -> listOf(uiState.selectedProvider to provider.defaultModel!!)
+            else -> emptyList()
+        }
     }
     Column(Modifier.fillMaxSize()) {
         TopBar(

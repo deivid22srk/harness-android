@@ -7,6 +7,7 @@ import dev.harness.core.env.Provisioner
 import dev.harness.core.pi.AgentSession
 import dev.harness.core.projects.ProjectRepository
 import dev.harness.core.settings.SettingsRepository
+import dev.harness.core.settings.ModelCatalog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,6 +26,7 @@ class HarnessContainer(app: Application) {
     val settings = SettingsRepository(app)
     val projects = ProjectRepository(paths, proot)
     val session = AgentSession(paths, proot, applicationScope)
+    val modelCatalog = ModelCatalog(paths, proot, settings)
 
     private val provisionLock = java.util.concurrent.atomic.AtomicBoolean(false)
 
@@ -49,12 +51,17 @@ class HarnessContainer(app: Application) {
     }
 
     /** Resolves the currently configured model, falling back to the catalog. */
-    fun launchConfig() = dev.harness.core.pi.PiLaunchConfig(
-        provider = settings.provider.ifBlank { null },
-        model = settings.model.ifBlank { null },
-        thinking = settings.thinking.ifBlank { null },
-        apiKeys = settings.apiKeyEnv(),
-    )
+    fun launchConfig(): dev.harness.core.pi.PiLaunchConfig {
+        // Ensure custom providers are visible to Pi before it starts.
+        runCatching { modelCatalog.syncModelsJson() }
+        return dev.harness.core.pi.PiLaunchConfig(
+            provider = settings.provider.ifBlank { null },
+            model = settings.model.ifBlank { null },
+            thinking = settings.thinking.ifBlank { null },
+            modelScope = modelCatalog.modelsScopeArg(settings.provider),
+            apiKeys = settings.apiKeyEnv(),
+        )
+    }
 }
 
 class HarnessApp : Application() {

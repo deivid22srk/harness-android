@@ -95,7 +95,12 @@ Ajustes que o build precisou (todos no `native/proot/build-proot.sh`):
   compilado via waf em modo cross, arquivado como `libtalloc.a` e linkado
   estaticamente (`-Wl,-Bstatic -ltalloc`).
 - **libandroid-shmem**: header instalado como `<sys/shm.h>` (o Android não tem
-  SysV shm) e `-D_PATH_TMP` fornecido (o `<paths.h>` do Bionic não o define).
+  SysV shm), `-D_PATH_TMP` fornecido (o `<paths.h>` do Bionic não o define) e o
+  shim linkado **estaticamente** no `libproot.so`.
+- **Binário autocontido**: `libproot.so` depende apenas de bibliotecas Bionic do
+  sistema (`libc`, `libdl`, `liblog`, `libandroid`). Isso é essencial porque o
+  Android não honra de forma confiável `LD_LIBRARY_PATH` em processos de app —
+  um PRoot que dependesse de um `.so` próprio poderia simplesmente não carregar.
 - **loader desacoplado** (`PROOT_UNBUNDLE_LOADER`): evita o empacotamento via
   `objcopy` (que exige o objcopy do alvo e falhava com "architecture UNKNOWN").
 - **ashmem_memfd.c**: recebe `#include <string.h>` (usa `strcmp`/`memset`).
