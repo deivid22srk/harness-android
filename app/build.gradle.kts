@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -31,7 +33,7 @@ android {
             if (!storeB64.isNullOrBlank()) {
                 val ksFile = layout.buildDirectory.file("harness-release.keystore").get().asFile
                 ksFile.parentFile.mkdirs()
-                ksFile.writeBytes(java.util.Base64.getDecoder().decode(storeB64.trim()))
+                ksFile.writeBytes(Base64.getDecoder().decode(storeB64.trim()))
                 storeFile = ksFile
                 storePassword = System.getenv("HARNESS_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("HARNESS_KEY_ALIAS") ?: "harness"
