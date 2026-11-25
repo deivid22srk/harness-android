@@ -31,8 +31,10 @@ class HarnessPaths(context: Context) {
     /** App-owned state (markers, indexes) that is NOT part of the guest rootfs. */
     val stateDir = File(filesDir, "state")
 
-    /** Directory where Android extracts the packaged .so files; they are executable. */
-    val nativeLibDir: File = File(context.applicationInfo.nativeLibraryDir)
+    /** Directory where Android extracts the packaged .so files; they are executable.
+     *  Null-safe: Robolectric leaves applicationInfo.nativeLibraryDir null, and
+     *  File(null) would NPE while booting the real Application in tests. */
+    val nativeLibDir: File = File(context.applicationInfo.nativeLibraryDir ?: "")
     val prootBinary = File(nativeLibDir, "libproot.so")
     val prootLoader = File(nativeLibDir, "libproot-loader.so")
 
