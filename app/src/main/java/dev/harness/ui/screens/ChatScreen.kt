@@ -88,6 +88,7 @@ import dev.harness.ui.components.HButton
 import dev.harness.ui.components.HButtonDefaults
 import dev.harness.ui.components.HChip
 import dev.harness.ui.components.HDialog
+import dev.harness.ui.components.HDivider
 import dev.harness.ui.components.HEmptyState
 import dev.harness.ui.components.HIconButton
 import dev.harness.ui.components.HMarkdown
