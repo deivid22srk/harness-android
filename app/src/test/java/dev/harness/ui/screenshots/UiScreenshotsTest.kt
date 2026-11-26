@@ -84,9 +84,11 @@ class UiScreenshotsTest {
 
         ### Checklist
 
-        1. Cancelar processos locais
-        2. Confirmar estado do GitHub
-        3. Fazer commit e push
+        - [x] Cancelar processos locais
+        - [x] Confirmar estado do GitHub
+        - [ ] Reabrir a fila
+            - Fila principal
+            - Fila de lote
 
         > Detalhe crítico: o build #167 passou uma hora antes — não é código.
 
@@ -94,6 +96,8 @@ class UiScreenshotsTest {
         |---|---|---|
         | build | ~2s | runner ausente |
         | game_so | ~2s | runner ausente |
+
+        ---
 
         ```kotlin
         fun main() {

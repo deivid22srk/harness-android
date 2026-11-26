@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -537,8 +538,17 @@ fun ChatList(
                 verticalArrangement = Arrangement.spacedBy(Space.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                items(state.items, key = { it.id }, contentType = { it::class.simpleName }) { item ->
+                itemsIndexed(state.items, key = { _, it -> it.id }, contentType = { _, it -> it::class.simpleName }) { index, item ->
                     Column(Modifier.widthIn(max = MaxMessageWidth).fillMaxWidth()) {
+                        // Time divider between assistant turns far apart in time
+                        // (PROMPT §5.2 — divisores "Novo"/"Hoje 16:55").
+                        val prev = state.items.getOrNull(index - 1) as? ChatItem.AssistantMessage
+                        val current = item as? ChatItem.AssistantMessage
+                        if (current != null && prev != null && prev.tsMs > 0 && current.tsMs > 0 &&
+                            current.tsMs - prev.tsMs > TimeDividerGapMs
+                        ) {
+                            TimeDivider(current.tsMs)
+                        }
                         when (item) {
                             is ChatItem.UserMessage -> UserMessage(item, onEditResend)
                             is ChatItem.AssistantMessage -> AssistantMessage(
@@ -546,6 +556,7 @@ fun ChatList(
                                 canRegenerate = lastPrompt != null && !isBusy && item == state.items.lastOrNull(),
                                 onRegenerate = onRegenerate,
                                 renderMarkdown = renderMarkdown,
+                                model = state.model,
                             )
                             is ChatItem.ToolGroup -> ToolGroupBlock(item)
                             is ChatItem.Notice -> NoticeRow(item)
@@ -625,9 +636,11 @@ private fun AssistantMessage(
     canRegenerate: Boolean,
     onRegenerate: () -> Unit,
     renderMarkdown: Boolean = true,
+    model: dev.harness.core.state.ModelInfo? = null,
 ) {
     val colors = HarnessTheme
     val clipboard = LocalClipboardManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxWidth()) {
         if (item.thinking.isNotBlank()) {
             dev.harness.ui.components.CollapsibleSection(title = stringResource(R.string.reasoning_label)) {
@@ -667,14 +680,88 @@ private fun AssistantMessage(
                         clipboard.setText(AnnotatedString(item.text.ifBlank { item.error ?: "" }))
                     },
                 )
+                add(MessageAction(stringResource(R.string.chat_menu_share)) { shareText(context, item.text) })
                 if (canRegenerate) {
                     add(MessageAction(stringResource(R.string.msg_regenerate)) { onRegenerate() })
                 }
             }
             MessageActions(actions)
         }
+        if (!item.streaming && (item.usage != null || item.tsMs > 0)) {
+            MessageFooter(item, model)
+        }
     }
 }
+
+/** Discreet per-response footer: model, output tokens, wall-clock time (§5.2). */
+@Composable
+private fun MessageFooter(
+    item: ChatItem.AssistantMessage,
+    model: dev.harness.core.state.ModelInfo?,
+) {
+    val colors = HarnessTheme
+    val time = remember(item.tsMs) {
+        if (item.tsMs <= 0) {
+            ""
+        } else {
+            java.time.Instant.ofEpochMilli(item.tsMs)
+                .atZone(java.time.ZoneId.systemDefault())
+                .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+        }
+    }
+    val parts = buildList {
+        model?.let { add(it.id) }
+        item.usage?.let { u ->
+            if (u.output > 0) add("%1.1fk tok".format(u.output / 1000f))
+        }
+        if (time.isNotBlank()) add(time)
+    }
+    if (parts.isEmpty()) return
+    Text(
+        text = parts.joinToString(" · "),
+        style = MonoStyle,
+        color = colors.textTertiary,
+        modifier = Modifier.padding(top = Space.xs),
+    )
+}
+
+private fun shareText(context: android.content.Context, text: String) {
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_TEXT, text)
+    }
+    runCatching { context.startActivity(android.content.Intent.createChooser(send, null)) }
+}
+
+/** Hairline — label — hairline divider between far-apart turns. */
+@Composable
+private fun TimeDivider(tsMs: Long) {
+    val colors = HarnessTheme
+    val sameDay = remember(tsMs) {
+        val zoned = java.time.Instant.ofEpochMilli(tsMs).atZone(java.time.ZoneId.systemDefault())
+        zoned.toLocalDate() == java.time.LocalDate.now()
+    }
+    val label = remember(tsMs, sameDay) {
+        val zoned = java.time.Instant.ofEpochMilli(tsMs).atZone(java.time.ZoneId.systemDefault())
+        val time = zoned.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+        if (sameDay) time else zoned.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM HH:mm"))
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.md),
+    ) {
+        HDivider(modifier = Modifier.weight(1f))
+        Text(
+            text = stringResource(R.string.chat_time_today, label),
+            style = MonoStyle,
+            color = colors.textTertiary,
+        )
+        HDivider(modifier = Modifier.weight(1f))
+    }
+}
+
+private const val TimeDividerGapMs = 5L * 60 * 1000
 
 private data class MessageAction(val label: String, val onClick: () -> Unit)
 

@@ -29,7 +29,11 @@ class ChatReducer {
         is PiEvent.MessageStart -> {
             val msg = event.message
             if (msg?.role == "assistant") {
-                val item = ChatItem.AssistantMessage(id = nextId(items(state)), streaming = true)
+                val item = ChatItem.AssistantMessage(
+                    id = nextId(items(state)),
+                    streaming = true,
+                    tsMs = System.currentTimeMillis(),
+                )
                 state.copy(items = state.items + item, status = AgentStatus.Streaming)
             } else {
                 state
@@ -112,7 +116,7 @@ class ChatReducer {
         var next = state.copy(lastUsage = event.usage ?: state.lastUsage)
         var idx = next.items.indexOfLast { it is ChatItem.AssistantMessage }
         if (idx < 0) {
-            next = next.copy(items = next.items + ChatItem.AssistantMessage(id = nextId(next.items), streaming = true))
+            next = next.copy(items = next.items + ChatItem.AssistantMessage(id = nextId(next.items), streaming = true, tsMs = System.currentTimeMillis()))
             idx = next.items.lastIndex
         }
         val current = next.items[idx] as ChatItem.AssistantMessage
@@ -126,7 +130,11 @@ class ChatReducer {
                 // assistant message text-only, but stop showing the caret.
                 current.copy(streaming = true)
             }
-            is AssistantStreamEvent.Done -> current.copy(streaming = false, stopReason = delta.reason)
+            is AssistantStreamEvent.Done -> current.copy(
+                streaming = false,
+                stopReason = delta.reason,
+                usage = event.usage ?: current.usage,
+            )
             is AssistantStreamEvent.StreamError -> current.copy(
                 streaming = false,
                 error = delta.error ?: delta.reason,
@@ -150,6 +158,9 @@ class ChatReducer {
             streaming = false,
             stopReason = message.stopReason,
             error = message.errorMessage,
+            tsMs = (state.items.getOrNull(idx) as? ChatItem.AssistantMessage)?.tsMs
+                ?: System.currentTimeMillis(),
+            usage = (state.items.getOrNull(idx) as? ChatItem.AssistantMessage)?.usage ?: state.lastUsage,
         )
         val items = state.items.toMutableList()
         if (idx >= 0) {

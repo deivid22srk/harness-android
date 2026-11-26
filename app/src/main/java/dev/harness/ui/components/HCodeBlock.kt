@@ -16,7 +16,11 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +29,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -93,8 +98,8 @@ private val NUMBER_PATTERN = Regex("""\b(?:0[xX][0-9a-fA-F_]+|\d[\d_]*(?:\.\d+)?
 private val ANNOTATION_PATTERN = Regex("""@[A-Za-z_][A-Za-z0-9_.]*""")
 
 /**
- * Tokenizes [code] into an [AnnotatedString] with code colors. Cheap enough to
- * run per frame during streaming (bounded by message length).
+ * Tokenizes [code] into an [AnnotatedString] with code colors. Runs only when
+ * the code actually settles (HCodeBlock debounces it during streaming).
  *
  * Priority: strings -> comments -> annotations -> numbers -> keywords/types.
  */
@@ -137,8 +142,33 @@ internal fun highlightCode(code: String, colors: CodeColors): AnnotatedString = 
 }
 
 /**
- * Code block: language label, copy action, horizontal scroll, selection
- * support and syntax highlighting.
+ * Diff fence highlighter (` ```diff `): added lines green, removed red, hunk
+ * headers accent. Uses the tool colors so diff chat blocks match the diffs
+ * shown in tool cards.
+ */
+internal fun highlightDiff(code: String, colors: CodeColors, ok: Color, err: Color): AnnotatedString =
+    buildAnnotatedString {
+        code.lines().forEachIndexed { i, line ->
+            val style = when {
+                line.startsWith("+++") || line.startsWith("---") ||
+                    line.startsWith("diff ") || line.startsWith("index ") ->
+                    SpanStyle(color = colors.comment, fontStyle = FontStyle.Italic)
+                line.startsWith("@@") || line.startsWith("** ") ->
+                    SpanStyle(color = colors.annotation, fontWeight = FontWeight.Medium)
+                line.startsWith("+") -> SpanStyle(color = ok, background = ok.copy(alpha = 0.12f))
+                line.startsWith("-") -> SpanStyle(color = err, background = err.copy(alpha = 0.12f))
+                else -> SpanStyle(color = colors.plain)
+            }
+            if (i > 0) append("\n")
+            withStyle(style) { append(line) }
+        }
+    }
+
+/**
+ * Code block: language label, copy action, wrap toggle, horizontal scroll,
+ * selection support, syntax highlighting (diff fences get line colors).
+ * Highlighting is debounced ~150 ms for large bodies so streaming ticks stay
+ * smooth; the first frame is always highlighted.
  */
 @Composable
 fun HCodeBlock(
@@ -150,7 +180,24 @@ fun HCodeBlock(
     val clipboard = LocalClipboardManager.current
     val shape = RoundedCornerShape(Radii.md)
     val codeColors = currentCodeColors()
-    val annotated = remember(code, codeColors) { highlightCode(code, codeColors) }
+    val isDiff = language?.lowercase() in setOf("diff", "patch")
+
+    var wrap by remember { mutableStateOf(false) }
+    var annotated by remember(code) {
+        mutableStateOf(
+            if (isDiff) highlightDiff(code, codeColors, colors.toolOk, colors.toolError)
+            else highlightCode(code, codeColors),
+        )
+    }
+    // Debounce re-highlight for large bodies (streaming re-fires per tick).
+    LaunchedEffect(code, isDiff, codeColors, colors.toolOk, colors.toolError) {
+        if (code.length >= 400) kotlinx.coroutines.delay(150)
+        annotated = if (isDiff) {
+            highlightDiff(code, codeColors, colors.toolOk, colors.toolError)
+        } else {
+            highlightCode(code, codeColors)
+        }
+    }
 
     Column(
         modifier
@@ -183,15 +230,28 @@ fun HCodeBlock(
                     }
                     .padding(horizontal = Space.sm, vertical = Space.xs),
             )
+            Text(
+                text = if (wrap) "\u21e4" else "\u21e5",
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.textSecondary,
+                modifier = Modifier
+                    .touchTargetClickable(role = androidx.compose.ui.semantics.Role.Button) { wrap = !wrap }
+                    .padding(horizontal = Space.sm, vertical = Space.xs),
+            )
         }
         HDivider()
         SelectionContainer(
             Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+                .then(if (wrap) Modifier else Modifier.horizontalScroll(rememberScrollState()))
                 .padding(Space.md),
         ) {
-            Text(text = annotated, style = dev.harness.ui.theme.CodeStyle, color = colors.textPrimary)
+            Text(
+                text = annotated,
+                style = dev.harness.ui.theme.CodeStyle,
+                color = colors.textPrimary,
+                softWrap = wrap,
+            )
         }
     }
 }

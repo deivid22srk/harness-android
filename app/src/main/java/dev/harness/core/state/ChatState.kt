@@ -34,6 +34,11 @@ sealed interface ChatItem {
         val streaming: Boolean = false,
         val stopReason: String? = null,
         val error: String? = null,
+        /** Wall-clock time the assistant turn started (epoch ms). 0 = unknown
+         *  (hydrated history) — the UI hides time footers for unknown stamps. */
+        val tsMs: Long = 0L,
+        /** Token usage of the finished turn, as reported by the Pi events. */
+        val usage: Usage? = null,
     ) : ChatItem {
         val hasText: Boolean get() = text.isNotBlank()
         val isThinkingOnly: Boolean get() = text.isBlank() && thinking.isNotBlank()

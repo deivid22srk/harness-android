@@ -82,4 +82,86 @@ class MarkdownParserTest {
         )
         assertEquals("abc **def", s.text)
     }
+
+    // -----------------------------------------------------------------
+    // Rodada 2 (M1): tables, nesting, task lists, horizontal rules
+    // -----------------------------------------------------------------
+
+    @Test
+    fun `pipe table with separator becomes table`() {
+        val src = "| Job | Duração |\n|---|---|\n| build | ~2s |\n| game | ~3s |"
+        val nodes = parseMarkdown(src)
+        val table = nodes.single() as MdNode.Table
+        assertEquals(listOf("Job", "Duração"), table.header)
+        assertEquals(2, table.rows.size)
+        assertEquals(listOf("build", "~2s"), table.rows[0])
+    }
+
+    @Test
+    fun `table rows are normalized to column count`() {
+        val src = "| a | b | c |\n|---|---|---|\n| 1 | 2 |"
+        val table = parseMarkdown(src).single() as MdNode.Table
+        assertEquals(3, table.rows[0].size)
+        assertEquals("", table.rows[0][2])
+    }
+
+    @Test
+    fun `escaped pipe stays inside a cell`() {
+        val src = "| expr | out |\n|---|---|\n| a \\| b | c |"
+        val table = parseMarkdown(src).single() as MdNode.Table
+        assertEquals("a | b", table.rows[0][0])
+    }
+
+    @Test
+    fun `table separator is not a horizontal rule`() {
+        val src = "| a | b |\n|---|---|\n| 1 | 2 |\n\ntexto\n\n---\n\nfim"
+        val nodes = parseMarkdown(src)
+        assertEquals(4, nodes.size)
+        assertTrue(nodes[0] is MdNode.Table)
+        assertTrue(nodes[1] is MdNode.Paragraph)
+        assertEquals(MdNode.HorizontalRule, nodes[2])
+        assertTrue(nodes[3] is MdNode.Paragraph)
+    }
+
+    @Test
+    fun `unterminated table still renders during streaming`() {
+        val src = "| a | b |\n|---|---|\n| 1 | 2"
+        val nodes = parseMarkdown(src)
+        val table = nodes.single() as MdNode.Table
+        assertEquals(1, table.rows.size)
+    }
+
+    @Test
+    fun `nested list indentation maps to depth`() {
+        val nodes = parseMarkdown("- raiz\n  - filho\n    - neto")
+        val depths = nodes.map { (it as MdNode.ListItem).depth }
+        assertEquals(listOf(0, 1, 2), depths)
+    }
+
+    @Test
+    fun `task list captures checkbox state`() {
+        val nodes = parseMarkdown("- [x] feito\n- [ ] pendente")
+        val done = nodes[0] as MdNode.ListItem
+        val pending = nodes[1] as MdNode.ListItem
+        assertEquals(true, done.taskDone)
+        assertEquals(false, pending.taskDone)
+        assertEquals("feito", done.text)
+    }
+
+    @Test
+    fun `horizontal rule variants`() {
+        val nodes = parseMarkdown("a\n\n---\n\n***\n\n___\n\nb")
+        assertEquals(listOf(3), nodes.filterIsInstance<MdNode.HorizontalRule>().size.let { listOf(it) })
+    }
+
+    @Test
+    fun `resource fixture of a typical agent answer parses`() {
+        val text = javaClass.getResourceAsStream("/markdown/agent-typical.md")!!
+            .readBytes().decodeToString()
+        val nodes = parseMarkdown(text)
+        assertTrue(nodes.any { it is MdNode.Table })
+        assertTrue(nodes.any { it is MdNode.Code })
+        assertTrue(nodes.any { it is MdNode.ListItem && it.taskDone != null })
+        assertTrue(nodes.any { it == MdNode.HorizontalRule })
+    }
 }

@@ -52,6 +52,8 @@
     <string name="diag_test_model_missing">Nenhum modelo selecionado ainda.</string>
 
     <!-- Chat -->
+    <string name="chat_menu_share">Compartilhar</string>
+    <string name="chat_time_today">Hoje às %1$s</string>
     <string name="chat_input_hint">Mensagem</string>
     <string name="chat_send">Enviar</string>
     <string name="chat_stop">Parar</string>
